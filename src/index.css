@@ -1,3 +1,17 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Remove default browser focus outlines (blue ring) */
+button:focus, input:focus, select:focus, textarea:focus, a:focus, [draggable]:focus {
+  outline: none;
+}
+*:focus-visible {
+  outline: 1px solid #0CEBF1;
+  outline-offset: -1px;
+}
