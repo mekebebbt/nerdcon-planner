@@ -60,11 +60,14 @@ const saveBookmarks = (ids) => {
   localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(ids));
 };
 
+// Returns true only for real attendee-facing sessions
+const isViewableSession = (s) =>
+  s.status === 'confirmed' && s.type !== 'block' && !s.block_type;
+
 // ── Mission Card ──────────────────────────────────────────────────────────────
-function MissionCard({ session, speakerMap, stageMap, bookmarks, onToggleBookmark }) {
+function MissionCard({ session, speakerMap, bookmarks, onToggleBookmark }) {
   const isBookmarked = bookmarks.includes(session.id);
-  const [flashState, setFlashState] = useState(null); // 'added' for brief flash
-  const stage = stageMap[session.stage_id];
+  const [flashState, setFlashState] = useState(null);
   const sessionSpeakers = (session.speakers || [])
     .map(s => {
       if (typeof s === 'string') return { speaker: speakerMap[s], role: 'speaker' };
@@ -73,6 +76,9 @@ function MissionCard({ session, speakerMap, stageMap, bookmarks, onToggleBookmar
     .filter(e => e.speaker);
   const primaryTopic = session.topics?.[0];
   const topicColor = primaryTopic ? TOPIC_TAG_COLORS[primaryTopic] : COLORS.primary;
+  const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
+  const endMins = startMins !== null ? startMins + session.duration_minutes : null;
+  const timeLabel = startMins !== null ? `${formatTime(startMins)} – ${formatTime(endMins)}` : null;
 
   return (
     <div
@@ -81,10 +87,10 @@ function MissionCard({ session, speakerMap, stageMap, bookmarks, onToggleBookmar
         border: `1px solid ${COLORS.border}`,
         borderLeft: `3px solid ${topicColor}`,
         borderRadius: '4px',
-        padding: '16px',
+        padding: '14px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '8px',
+        gap: '6px',
         transition: 'border-color 0.15s, transform 0.15s',
       }}
       onMouseEnter={e => {
@@ -97,23 +103,19 @@ function MissionCard({ session, speakerMap, stageMap, bookmarks, onToggleBookmar
         e.currentTarget.style.transform = 'translateY(0)';
       }}
     >
-      {/* Stage + Duration */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{
+      {/* Time range */}
+      {timeLabel && (
+        <div style={{
           fontFamily: FONTS.mono, fontSize: '10px',
-          color: stage?.color || COLORS.primary,
-          letterSpacing: '0.1em', textTransform: 'uppercase',
+          color: COLORS.textMuted, letterSpacing: '0.05em',
         }}>
-          {stage?.name || 'TBD'}
-        </span>
-        <span style={{ fontFamily: FONTS.mono, fontSize: '10px', color: COLORS.textMuted }}>
-          {session.duration_minutes} MIN
-        </span>
-      </div>
+          {timeLabel} · {session.duration_minutes}m
+        </div>
+      )}
 
       {/* Title */}
       <h3 style={{
-        fontFamily: FONTS.pixel, fontSize: '11px',
+        fontFamily: FONTS.pixel, fontSize: '10px',
         color: COLORS.textPrimary, margin: 0,
         lineHeight: 1.6, letterSpacing: '0.05em',
         textTransform: 'uppercase',
@@ -151,7 +153,7 @@ function MissionCard({ session, speakerMap, stageMap, bookmarks, onToggleBookmar
 
       {/* Speakers */}
       {sessionSpeakers.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '2px' }}>
           {sessionSpeakers.map(({ speaker: sp, role }) => (
             <div key={sp.id} style={{ fontFamily: FONTS.mono, fontSize: '11px', display: 'flex', alignItems: 'center', gap: '6px' }}>
               {role === 'moderator' && (
@@ -213,11 +215,15 @@ export default function ViewPage() {
       setLoading(true);
       try {
         const [sessRes, spkRes, stgRes] = await Promise.all([
-          supabase.from('sessions').select('*').eq('status', 'confirmed'),
+          supabase.from('sessions').select('*'),
           supabase.from('speakers').select('*'),
           supabase.from('stages').select('*').order('sort_order'),
         ]);
-        if (sessRes.data) setSessions(sessRes.data);
+        if (sessRes.data) {
+          // Filter client-side: only confirmed, non-block sessions
+          const viewable = sessRes.data.filter(isViewableSession);
+          setSessions(viewable);
+        }
         if (spkRes.data) setSpeakers(spkRes.data);
         if (stgRes.data) setStages(stgRes.data);
       } catch (e) {
@@ -240,7 +246,8 @@ export default function ViewPage() {
     return map;
   }, [stages]);
 
-  const groupedByTimeSlot = useMemo(() => {
+  // Group sessions by stage, sorted by start time within each stage
+  const sessionsByStage = useMemo(() => {
     let filtered = sessions.filter(s => s.day === selectedDay && s.start_time);
 
     if (activeTopics.length > 0) {
@@ -255,21 +262,17 @@ export default function ViewPage() {
 
     filtered.sort((a, b) => isoToMinutes(a.start_time) - isoToMinutes(b.start_time));
 
-    const groups = {};
+    const byStage = {};
     filtered.forEach(s => {
-      const slotKey = isoToMinutes(s.start_time);
-      if (!groups[slotKey]) groups[slotKey] = [];
-      groups[slotKey].push(s);
+      if (!byStage[s.stage_id]) byStage[s.stage_id] = [];
+      byStage[s.stage_id].push(s);
     });
 
-    return Object.entries(groups)
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .map(([mins, slotSessions]) => ({
-        time: formatTime(Number(mins)),
-        minutes: Number(mins),
-        sessions: slotSessions,
-      }));
-  }, [sessions, selectedDay, activeTopics, showBookmarksOnly, bookmarks]);
+    // Return stages in sort_order, only those with sessions
+    return stages
+      .filter(st => byStage[st.id]?.length > 0)
+      .map(st => ({ stage: st, sessions: byStage[st.id] }));
+  }, [sessions, stages, selectedDay, activeTopics, showBookmarksOnly, bookmarks]);
 
   const toggleBookmark = (sessionId) => {
     setBookmarks(prev => {
@@ -423,13 +426,12 @@ export default function ViewPage() {
         )}
       </div>
 
-      {/* ── Main Content ───────────────────────────────────────────────── */}
+      {/* ── Main Content — Stage Columns ─────────────────────────────── */}
       <main style={{
         padding: '24px',
-        maxWidth: '1200px',
-        margin: '0 auto',
         width: '100%',
         boxSizing: 'border-box',
+        overflowX: 'auto',
       }}>
         {loading ? (
           <div style={{
@@ -440,7 +442,7 @@ export default function ViewPage() {
           }}>
             LOADING MISSIONS...
           </div>
-        ) : groupedByTimeSlot.length === 0 ? (
+        ) : sessionsByStage.length === 0 ? (
           <div style={{
             fontFamily: FONTS.pixel, fontSize: '12px',
             color: COLORS.textMuted, textAlign: 'center',
@@ -451,26 +453,48 @@ export default function ViewPage() {
               : 'NO MISSIONS SCHEDULED'}
           </div>
         ) : (
-          groupedByTimeSlot.map(slot => (
-            <div key={slot.minutes} style={{ marginBottom: '32px' }}>
-              {/* Time slot header */}
-              <div style={{
-                fontFamily: FONTS.pixel, fontSize: '12px',
-                color: COLORS.primary, marginBottom: '12px',
-                paddingBottom: '8px',
-                borderBottom: `1px solid ${COLORS.border}`,
-                letterSpacing: '0.1em',
+          <div className="view-stage-columns" style={{
+            display: 'flex',
+            gap: '20px',
+            alignItems: 'flex-start',
+          }}>
+            {sessionsByStage.map(({ stage, sessions: stageSessions }) => (
+              <div key={stage.id} className="view-stage-column" style={{
+                width: '320px',
+                minWidth: '320px',
+                flexShrink: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
               }}>
-                &gt; {slot.time}
-              </div>
+                {/* Stage header — visually distinct from cards */}
+                <div style={{
+                  padding: '12px 14px',
+                  background: (stage.color || COLORS.primary) + '15',
+                  borderTop: `3px solid ${stage.color || COLORS.primary}`,
+                  borderBottom: `1px solid ${COLORS.border}`,
+                  borderLeft: 'none',
+                  borderRight: 'none',
+                  borderRadius: 0,
+                }}>
+                  <div style={{
+                    fontFamily: FONTS.pixel, fontSize: '11px',
+                    color: stage.color || COLORS.primary,
+                    letterSpacing: '0.1em', textTransform: 'uppercase',
+                    lineHeight: 1.4,
+                  }}>
+                    {stage.name}
+                  </div>
+                  <div style={{
+                    fontFamily: FONTS.mono, fontSize: '10px',
+                    color: COLORS.textMuted, marginTop: '6px',
+                  }}>
+                    {stageSessions.length} {stageSessions.length === 1 ? 'session' : 'sessions'}
+                  </div>
+                </div>
 
-              {/* Responsive card grid */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                gap: '16px',
-              }}>
-                {slot.sessions.map(s => (
+                {/* Session cards */}
+                {stageSessions.map(s => (
                   <MissionCard
                     key={s.id}
                     session={s}
@@ -481,10 +505,23 @@ export default function ViewPage() {
                   />
                 ))}
               </div>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </main>
+
+      {/* ── Mobile stacking ──────────────────────────────────────────── */}
+      <style>{`
+        @media (max-width: 720px) {
+          .view-stage-columns {
+            flex-direction: column !important;
+          }
+          .view-stage-column {
+            width: 100% !important;
+            min-width: 0 !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

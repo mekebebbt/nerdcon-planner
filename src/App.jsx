@@ -124,7 +124,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       ...(editingSession || {}),
       id: editingSession?.id || null,
       title: title || `${format} Session`,
-      status, format, duration_minutes: duration,
+      status: isBlock ? 'block' : status, format, duration_minutes: duration,
       speakers: selectedSpeakers, topics, notes,
       stage_id: stageId, day: selectedDay,
       capacity: capacity === '' ? null : Number(capacity),
@@ -633,13 +633,18 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
         const height = (end - start) / 5 * SLOT_HEIGHT;
         return (
           <div key={`closed-${start}`} style={{
-            position: 'absolute', left: '1px', right: '1px',
+            position: 'absolute', left: 0, right: 0,
             top: `${topOffset}px`, height: `${height}px`,
-            background: `repeating-linear-gradient(45deg, #0d0d0d, #0d0d0d 4px, #14141425 4px, #14141425 8px)`,
-            borderRadius: '2px', zIndex: 5, pointerEvents: 'none',
+            background: 'repeating-linear-gradient(45deg, #111 0px, #111 8px, #0a0a0a 8px, #0a0a0a 16px)',
+            zIndex: 5, pointerEvents: 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
+            overflow: 'hidden',
           }}>
-            <span style={{ fontSize: '9px', color: '#2a2a2a', letterSpacing: '0.1em', fontWeight: 'bold', textTransform: 'uppercase' }}>STAGE CLOSED</span>
+            <span style={{
+              fontSize: '11px', color: '#2a2a2a', letterSpacing: '0.2em',
+              fontWeight: 'bold', textTransform: 'uppercase',
+              writingMode: 'vertical-rl', whiteSpace: 'nowrap',
+            }}>STAGE CLOSED</span>
           </div>
         );
       })}
@@ -880,7 +885,7 @@ export default function NerdConPlanner() {
     const dayDate = DAYS.find(d => d.id === selectedDay)?.full;
     await handleSave({
       id: null, title: label, type: 'block', block_type: blockType,
-      status: 'confirmed', format: null, duration_minutes: duration,
+      status: 'block', format: null, duration_minutes: duration,
       speakers: [], topics: [], notes: null,
       stage_id: stageId, day: selectedDay, column_index: colIndex,
       start_time: minutesToIso(dayDate, slotMins),

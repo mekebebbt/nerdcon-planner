@@ -39,5 +39,5 @@ export const TOPIC_TAG_COLORS = {
 };
 
 export const FORMAT_TAGS = [
-  "Keynote", "Fireside", "Panel", "Debate", "Rant", "Failure Therapy",
+  "Keynote", "Fireside", "Panel", "Debate", "Rant", "Failure Therapy", "Demo",
 ];
