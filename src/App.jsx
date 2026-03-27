@@ -81,7 +81,7 @@ const getSpeakerRole = (speakers, speakerId) => {
   return entry?.role || 'speaker';
 };
 
-function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay }) {
+function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded }) {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('placeholder');
   const [format, setFormat] = useState('Panel');
@@ -93,6 +93,26 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [description, setDescription] = useState('');
   const [stageId, setStageId] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [newSpkName, setNewSpkName] = useState('');
+  const [newSpkTitle, setNewSpkTitle] = useState('');
+  const [newSpkCompany, setNewSpkCompany] = useState('');
+  const [addingSpk, setAddingSpk] = useState(false);
+
+  const handleAddSpeaker = async () => {
+    if (!newSpkName.trim() || addingSpk) return;
+    setAddingSpk(true);
+    const { data, error } = await supabase.from('speakers').insert({
+      name: newSpkName.trim(),
+      title: newSpkTitle.trim() || null,
+      company: newSpkCompany.trim() || null,
+    }).select();
+    if (error) { alert(error.message); setAddingSpk(false); return; }
+    const newSpeaker = data[0];
+    if (onSpeakerAdded) onSpeakerAdded(newSpeaker);
+    setSelectedSpeakers(prev => [...prev, { speaker_id: newSpeaker.id, role: 'speaker' }]);
+    setNewSpkName(''); setNewSpkTitle(''); setNewSpkCompany('');
+    setAddingSpk(false);
+  };
 
   const isBlock = editingSession?.type === 'block';
 
@@ -252,6 +272,20 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                     </div>
                   );
                 })}
+              </div>
+              {/* Inline Add Speaker Form */}
+              <div style={{ marginTop: '10px', padding: '10px', background: '#0a1212', border: '1px dashed #1a3a3a', borderRadius: '6px' }}>
+                <div style={{ fontSize: '11px', color: '#4a6a6a', letterSpacing: '0.05em', marginBottom: '8px', textTransform: 'uppercase' }}>Add New Speaker</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                  <input value={newSpkName} onChange={e => setNewSpkName(e.target.value)} placeholder="Name *" style={inputStyle} />
+                  <input value={newSpkTitle} onChange={e => setNewSpkTitle(e.target.value)} placeholder="Title" style={inputStyle} />
+                  <input value={newSpkCompany} onChange={e => setNewSpkCompany(e.target.value)} placeholder="Company" style={inputStyle} />
+                </div>
+                <button onClick={handleAddSpeaker} disabled={!newSpkName.trim() || addingSpk} style={{
+                  marginTop: '8px', background: newSpkName.trim() ? '#0CEBF1' : '#1a2a2a', border: 'none', borderRadius: '4px',
+                  padding: '6px 16px', color: newSpkName.trim() ? '#001a1a' : '#4a6a6a', cursor: newSpkName.trim() ? 'pointer' : 'default',
+                  fontSize: '11px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.03em',
+                }}>{addingSpk ? 'Adding…' : 'Add Speaker'}</button>
               </div>
             </div>
           </>
@@ -1313,7 +1347,8 @@ export default function NerdConPlanner() {
       </div>
 
       <SessionModal isOpen={showModal} onClose={() => { setShowModal(false); setEditingSession(null); }}
-        onSave={handleSave} onDelete={handleDelete} editingSession={editingSession} speakers={speakers} stages={stages} selectedDay={selectedDay} />
+        onSave={handleSave} onDelete={handleDelete} editingSession={editingSession} speakers={speakers} stages={stages} selectedDay={selectedDay}
+        onSpeakerAdded={(sp) => setSpeakers(prev => [...prev, sp])} />
 
       <ManageStagesModal isOpen={showStagesModal} onClose={() => setShowStagesModal(false)} stages={stages} onStagesChange={setStages} />
 

@@ -732,8 +732,8 @@ export default function ViewPage() {
         background: COLORS.bgCard, borderBottom: `1px solid ${COLORS.border}`,
         padding: '18px 28px', position: 'sticky', top: 0, zIndex: 100,
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px', gap: '12px' }}>
+          <div style={{ textAlign: 'center' }}>
             <h1 style={{ fontFamily: FONTS.mono, fontSize: '18px', fontWeight: 700, color: COLORS.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>
               Fintech NerdCon
             </h1>
