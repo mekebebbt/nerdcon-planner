@@ -610,10 +610,10 @@ function SessionCard({ session, speakers, onClick, style, onDragStart }) {
       onClick={onClick} style={{
         margin: '0 2px',
         position: 'relative',
-        background: statusDef.color,
-        borderTop: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
-        borderRight: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
-        borderBottom: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
+        background: 'rgb(13,13,13)',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        borderRight: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
         borderLeft: `3px solid ${leftAccent}`,
         borderRadius: '6px', padding: dur < 20 ? '2px 6px' : '6px 8px', cursor: 'grab',
         overflow: 'hidden', boxSizing: 'border-box', transition: 'opacity 0.15s', zIndex: 10,
@@ -1205,8 +1205,8 @@ export default function NerdConPlanner() {
       {/* Top Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: '52px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgb(8,8,8)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.15em', color: '#3568FF' }}>FINTECH</span>
-          <span style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.15em', color: '#ffffff' }}>NERDCON</span>
+          <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: '#3568FF', fontFamily: "'Press Start 2P', cursive" }}>FINTECH</span>
+          <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: '#ffffff', fontFamily: "'Press Start 2P', cursive" }}>NERDCON</span>
           <span style={{ fontSize: '10px', color: 'rgba(240,240,240,0.3)', letterSpacing: '0.1em' }}>SAN DIEGO · NOV 18–20 · OPS</span>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -1286,10 +1286,10 @@ export default function NerdConPlanner() {
               {/* ── Body (time column + slot columns) ── */}
               <div style={{ display: 'flex' }}>
                 {/* Time column — sticky left */}
-                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 15, background: 'rgb(5,5,5)' }}>
+                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 15, background: 'rgb(18,18,18)' }}>
                   {TIME_SLOTS.map(mins => (
-                    <div key={mins} style={{ height: `${SLOT_HEIGHT}px`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.06)', borderBottom: mins % 60 === 0 ? '1px solid rgb(18,18,18)' : mins % 30 === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                      {mins % 30 === 0 && <span style={{ fontSize: '10px', color: mins % 60 === 0 ? 'rgba(240,240,240,0.3)' : 'rgba(255,255,255,0.08)', fontFamily: 'monospace' }}>{formatTime(mins)}</span>}
+                    <div key={mins} style={{ height: `${SLOT_HEIGHT}px`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', borderBottom: mins % 60 === 0 ? '1px solid rgba(255,255,255,0.06)' : mins % 30 === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                      {mins % 30 === 0 && <span style={{ fontSize: '10px', color: mins % 60 === 0 ? 'rgba(240,240,240,0.35)' : 'rgba(240,240,240,0.15)', fontFamily: 'monospace' }}>{formatTime(mins)}</span>}
                     </div>
                   ))}
                 </div>
