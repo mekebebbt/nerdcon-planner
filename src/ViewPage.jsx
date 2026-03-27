@@ -271,8 +271,8 @@ function SessionDetailModal({ session, speakerMap, stageMap, bookmarks, onToggle
             {session.title}
           </h2>
 
-          {/* Description / Notes */}
-          {(session.description || session.notes) && (
+          {/* Description (public only) */}
+          {session.description && (
             <div style={{
               fontFamily: FONTS.sans, fontSize: '14px',
               color: COLORS.textMuted, lineHeight: 1.75,
@@ -280,7 +280,7 @@ function SessionDetailModal({ session, speakerMap, stageMap, bookmarks, onToggle
               padding: '16px', background: COLORS.bgElevated,
               borderRadius: '10px', border: `1px solid ${COLORS.border}`,
             }}>
-              {session.description || session.notes}
+              {session.description}
             </div>
           )}
 

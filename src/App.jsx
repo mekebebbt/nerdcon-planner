@@ -305,7 +305,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
 
         {!isBlock && (
           <div>
-            <label style={labelStyle}>Description</label>
+            <label style={labelStyle}>Description (public)</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Public description shown to attendees..." style={{ ...inputStyle, resize: 'vertical' }} />
           </div>
         )}
