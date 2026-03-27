@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 import { TOPIC_TAGS, TOPIC_TAG_COLORS, FORMAT_TAGS } from './stages.config.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -103,6 +104,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
     if (!newSpkName.trim() || addingSpk) return;
     setAddingSpk(true);
     const { data, error } = await supabase.from('speakers').insert({
+      id: uuidv4(),
       name: newSpkName.trim(),
       title: newSpkTitle.trim() || null,
       company: newSpkCompany.trim() || null,
