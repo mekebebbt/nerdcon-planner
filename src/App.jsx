@@ -97,6 +97,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [newSpkTitle, setNewSpkTitle] = useState('');
   const [newSpkCompany, setNewSpkCompany] = useState('');
   const [addingSpk, setAddingSpk] = useState(false);
+  const [showAddSpk, setShowAddSpk] = useState(false);
 
   const handleAddSpeaker = async () => {
     if (!newSpkName.trim() || addingSpk) return;
@@ -273,20 +274,28 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                   );
                 })}
               </div>
-              {/* Inline Add Speaker Form */}
-              <div style={{ marginTop: '10px', padding: '10px', background: '#0a1212', border: '1px dashed #1a3a3a', borderRadius: '6px' }}>
-                <div style={{ fontSize: '11px', color: '#4a6a6a', letterSpacing: '0.05em', marginBottom: '8px', textTransform: 'uppercase' }}>Add New Speaker</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
-                  <input value={newSpkName} onChange={e => setNewSpkName(e.target.value)} placeholder="Name *" style={inputStyle} />
-                  <input value={newSpkTitle} onChange={e => setNewSpkTitle(e.target.value)} placeholder="Title" style={inputStyle} />
-                  <input value={newSpkCompany} onChange={e => setNewSpkCompany(e.target.value)} placeholder="Company" style={inputStyle} />
+              {/* Collapsible Add Speaker Form */}
+              <button onClick={() => setShowAddSpk(prev => !prev)} style={{
+                marginTop: '10px', background: 'none', border: `1px dashed #1a3a3a`, borderRadius: '6px',
+                padding: '8px 12px', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit',
+                color: '#4a6a6a', letterSpacing: '0.05em', textTransform: 'uppercase', width: '100%', textAlign: 'left',
+              }}>
+                {showAddSpk ? '▾' : '▸'} Add new speaker
+              </button>
+              {showAddSpk && (
+                <div style={{ marginTop: '6px', padding: '10px', background: '#0a1212', border: '1px solid #1a3a3a', borderRadius: '6px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                    <input value={newSpkName} onChange={e => setNewSpkName(e.target.value)} placeholder="Name *" style={inputStyle} />
+                    <input value={newSpkTitle} onChange={e => setNewSpkTitle(e.target.value)} placeholder="Title" style={inputStyle} />
+                    <input value={newSpkCompany} onChange={e => setNewSpkCompany(e.target.value)} placeholder="Company" style={inputStyle} />
+                  </div>
+                  <button onClick={handleAddSpeaker} disabled={!newSpkName.trim() || addingSpk} style={{
+                    marginTop: '8px', background: newSpkName.trim() ? '#0CEBF1' : '#1a2a2a', border: 'none', borderRadius: '4px',
+                    padding: '6px 16px', color: newSpkName.trim() ? '#001a1a' : '#4a6a6a', cursor: newSpkName.trim() ? 'pointer' : 'default',
+                    fontSize: '11px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.03em',
+                  }}>{addingSpk ? 'Adding…' : 'Add Speaker'}</button>
                 </div>
-                <button onClick={handleAddSpeaker} disabled={!newSpkName.trim() || addingSpk} style={{
-                  marginTop: '8px', background: newSpkName.trim() ? '#0CEBF1' : '#1a2a2a', border: 'none', borderRadius: '4px',
-                  padding: '6px 16px', color: newSpkName.trim() ? '#001a1a' : '#4a6a6a', cursor: newSpkName.trim() ? 'pointer' : 'default',
-                  fontSize: '11px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.03em',
-                }}>{addingSpk ? 'Adding…' : 'Add Speaker'}</button>
-              </div>
+              )}
             </div>
           </>
         )}

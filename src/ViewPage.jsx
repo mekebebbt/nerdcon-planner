@@ -42,6 +42,7 @@ const COLORS = {
 };
 
 const FONTS = {
+  pixel: "'Press Start 2P', cursive",
   mono: "'JetBrains Mono', ui-monospace, monospace",
   sans: "'DM Sans', ui-sans-serif, system-ui, sans-serif",
 };
@@ -732,16 +733,16 @@ export default function ViewPage() {
         background: COLORS.bgCard, borderBottom: `1px solid ${COLORS.border}`,
         padding: '18px 28px', position: 'sticky', top: 0, zIndex: 100,
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '16px', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '16px', position: 'relative' }}>
           <div style={{ textAlign: 'center' }}>
-            <h1 style={{ fontFamily: FONTS.mono, fontSize: '18px', fontWeight: 700, color: COLORS.textPrimary, margin: 0, letterSpacing: '-0.02em' }}>
+            <h1 style={{ fontFamily: FONTS.pixel, fontSize: '16px', fontWeight: 400, color: COLORS.textPrimary, margin: 0, letterSpacing: '0.02em' }}>
               Fintech NerdCon
             </h1>
-            <div style={{ fontFamily: FONTS.sans, fontSize: '13px', color: COLORS.textMuted, marginTop: '3px' }}>
+            <div style={{ fontFamily: FONTS.sans, fontSize: '13px', color: COLORS.textMuted, marginTop: '6px' }}>
               San Diego · Nov 18–20, 2026
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ position: 'absolute', right: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
             {attendee && (
               <div style={{ fontFamily: FONTS.sans, fontSize: '13px', color: COLORS.textMuted, padding: '6px 14px', border: `1px solid ${COLORS.border}`, borderRadius: '8px' }}>
                 <span style={{ color: COLORS.textPrimary, fontWeight: 500 }}>{attendee.name}</span>
@@ -771,8 +772,8 @@ export default function ViewPage() {
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {DAYS.map((day, i) => (
             <button key={day.id} onClick={() => setSelectedDay(day.id)} style={{
-              fontFamily: FONTS.mono, fontSize: '12px', fontWeight: 600,
-              padding: '9px 20px',
+              fontFamily: FONTS.pixel, fontSize: '10px', fontWeight: 400,
+              padding: '10px 20px',
               background: selectedDay === day.id ? COLORS.primary : 'transparent',
               color: selectedDay === day.id ? '#fff' : COLORS.textMuted,
               border: `1px solid ${selectedDay === day.id ? COLORS.primary : COLORS.border}`,
