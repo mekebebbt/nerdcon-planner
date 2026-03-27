@@ -271,8 +271,8 @@ function SessionDetailModal({ session, speakerMap, stageMap, bookmarks, onToggle
             {session.title}
           </h2>
 
-          {/* Description */}
-          {session.description && (
+          {/* Description / Notes */}
+          {(session.description || session.notes) && (
             <div style={{
               fontFamily: FONTS.sans, fontSize: '14px',
               color: COLORS.textMuted, lineHeight: 1.75,
@@ -280,7 +280,7 @@ function SessionDetailModal({ session, speakerMap, stageMap, bookmarks, onToggle
               padding: '16px', background: COLORS.bgElevated,
               borderRadius: '10px', border: `1px solid ${COLORS.border}`,
             }}>
-              {session.description}
+              {session.description || session.notes}
             </div>
           )}
 
@@ -769,7 +769,7 @@ export default function ViewPage() {
         </div>
 
         {/* Day tabs */}
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {DAYS.map((day, i) => (
             <button key={day.id} onClick={() => setSelectedDay(day.id)} style={{
               fontFamily: FONTS.pixel, fontSize: '10px', fontWeight: 400,

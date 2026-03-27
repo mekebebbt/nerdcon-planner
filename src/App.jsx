@@ -106,6 +106,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       name: newSpkName.trim(),
       title: newSpkTitle.trim() || null,
       company: newSpkCompany.trim() || null,
+      created_at: new Date().toISOString(),
     }).select();
     if (error) { alert(error.message); setAddingSpk(false); return; }
     const newSpeaker = data[0];
