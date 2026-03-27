@@ -13,9 +13,9 @@ const DAYS = [
 ];
 
 const SESSION_STATUSES = [
-  { id: 'placeholder', label: 'Placeholder', color: '#080f0f', border: '#1a3a3a', textColor: '#2a5a5a', borderStyle: 'dashed' },
-  { id: 'pencilled', label: 'Pencilled', color: '#0a1f12', border: '#00B97A', textColor: '#ccffe8', borderStyle: 'solid', borderWidth: '2px' },
-  { id: 'confirmed', label: 'Confirmed', color: '#003a3a', border: '#0CEBF1', textColor: '#ffffff', borderStyle: 'solid', borderWidth: '1px' },
+  { id: 'placeholder', label: 'Placeholder', color: '#080808', border: '#1a1a1a', textColor: '#333333', borderStyle: 'dashed', borderWidth: '1px' },
+  { id: 'pencilled', label: 'Pencilled', color: '#1a1200', border: '#d97706', textColor: '#fbbf24', borderStyle: 'solid', borderWidth: '2px' },
+  { id: 'confirmed', label: 'Confirmed', color: '#0a0a0a', border: '#222222', textColor: '#ffffff', borderStyle: 'solid', borderWidth: '1px' },
 ];
 
 const BLOCK_TYPES = [
@@ -90,6 +90,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [selectedSpeakers, setSelectedSpeakers] = useState([]);
   const [topics, setTopics] = useState([]);
   const [notes, setNotes] = useState('');
+  const [description, setDescription] = useState('');
   const [stageId, setStageId] = useState('');
   const [capacity, setCapacity] = useState('');
 
@@ -104,13 +105,14 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setSelectedSpeakers(normalizeSpeakers(editingSession.speakers));
       setTopics(editingSession.topics || []);
       setNotes(editingSession.notes || '');
+      setDescription(editingSession.description || '');
       setStageId(editingSession.stage_id || (stages[0]?.id || ''));
       setCapacity(editingSession.capacity ?? '');
       if (editingSession.start_time) setStartTime(formatTime24(isoToMinutes(editingSession.start_time)));
     } else {
       setTitle(''); setStatus('placeholder'); setFormat('Panel');
       setDuration(30); setStartTime('09:00'); setSelectedSpeakers([]);
-      setTopics([]); setNotes(''); setStageId(stages[0]?.id || '');
+      setTopics([]); setNotes(''); setDescription(''); setStageId(stages[0]?.id || '');
       setCapacity('');
     }
   }, [editingSession, isOpen, stages]);
@@ -125,7 +127,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       id: editingSession?.id || null,
       title: title || `${format} Session`,
       status: isBlock ? 'block' : status, format, duration_minutes: duration,
-      speakers: selectedSpeakers, topics, notes,
+      speakers: selectedSpeakers, topics, notes, description,
       stage_id: stageId, day: selectedDay,
       capacity: capacity === '' ? null : Number(capacity),
       start_time: minutesToIso(DAYS.find(d => d.id === selectedDay)?.full, startMins),
@@ -255,9 +257,16 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
           </>
         )}
 
+        {!isBlock && (
+          <div>
+            <label style={labelStyle}>Description</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder="Public description shown to attendees..." style={{ ...inputStyle, resize: 'vertical' }} />
+          </div>
+        )}
+
         <div>
           <label style={labelStyle}>Notes</label>
-          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Internal notes..." style={{ ...inputStyle, resize: 'vertical' }} />
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Internal notes (not shown to attendees)..." style={{ ...inputStyle, resize: 'vertical' }} />
         </div>
       </div>
 
@@ -474,14 +483,15 @@ function BlockSidebarItem({ block, onDragStart }) {
 function SidebarCard({ session, speakers, onClick, onDragStart }) {
   const statusDef = SESSION_STATUSES.find(s => s.id === session.status) || SESSION_STATUSES[0];
   const sessionSpeakers = speakers.filter(sp => getSpeakerIds(session.speakers).includes(sp.id));
-  const metaColor = session.status === 'confirmed' ? '#7ae8e8' : '#4a8a8a';
+  const metaColor = statusDef.textColor;
   return (
     <div draggable="true"
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(session); }}
       onClick={onClick}
       style={{
         background: statusDef.color,
-        border: `1px solid ${statusDef.border}`, borderRadius: '4px',
+        border: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
+        borderRadius: '4px',
         padding: '8px 10px', marginBottom: '6px', cursor: 'grab', transition: 'opacity 0.15s',
       }}
       onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
@@ -489,10 +499,10 @@ function SidebarCard({ session, speakers, onClick, onDragStart }) {
     >
       <div style={{ fontSize: '11px', fontWeight: 'bold', color: statusDef.textColor, letterSpacing: '0.05em', lineHeight: 1.3, marginBottom: '4px' }}>{session.title}</div>
       <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '3px', background: statusDef.border + '22', color: metaColor, letterSpacing: '0.05em' }}>{session.format || 'TBD'}</span>
-        <span style={{ fontSize: '10px', color: metaColor }}>{session.duration_minutes}m</span>
+        <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '3px', background: statusDef.border + '33', color: metaColor, letterSpacing: '0.05em', opacity: 0.7 }}>{session.format || 'TBD'}</span>
+        <span style={{ fontSize: '10px', color: metaColor, opacity: 0.6 }}>{session.duration_minutes}m</span>
       </div>
-      {sessionSpeakers.length > 0 && <div style={{ fontSize: '10px', color: metaColor, marginTop: '4px' }}>{sessionSpeakers.map(sp => {
+      {sessionSpeakers.length > 0 && <div style={{ fontSize: '10px', color: metaColor, marginTop: '4px', opacity: 0.7 }}>{sessionSpeakers.map(sp => {
         const role = getSpeakerRole(session.speakers, sp.id);
         return role === 'moderator' ? `[MOD] ${sp.name}` : sp.name;
       }).join(', ')}</div>}
@@ -542,29 +552,38 @@ function SessionCard({ session, speakers, onClick, style, onDragStart }) {
   const topicColor = session.topics?.[0] ? TOPIC_TAG_COLORS[session.topics[0]] : '#0CEBF1';
   const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
   const timeLabel = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(startMins + session.duration_minutes)}` : null;
-  const metaColor = session.status === 'confirmed' ? '#7ae8e8' : '#4a8a8a';
+  const metaColor = statusDef.textColor;
+  const leftAccent = topicColor;
+  const dur = session.duration_minutes || 0;
+  const showFormat = dur >= 20;
+  const showSpeakers = dur >= 40;
+  const showTopics = dur >= 40;
   return (
     <div draggable="true"
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
       onClick={onClick} style={{
-        position: 'absolute', left: '2px', right: '2px',
+        margin: '0 2px',
+        position: 'relative',
         background: statusDef.color,
-        border: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
-        borderLeft: `4px solid ${session.status === 'confirmed' ? '#0CEBF1' : topicColor}`,
-        borderRadius: '4px', padding: '4px 6px', cursor: 'grab',
-        overflow: 'hidden', boxSizing: 'border-box', transition: 'opacity 0.15s', zIndex: 10, ...style
+        borderTop: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
+        borderRight: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
+        borderBottom: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
+        borderLeft: `3px solid ${leftAccent}`,
+        borderRadius: '4px', padding: dur < 20 ? '2px 6px' : '6px 8px', cursor: 'grab',
+        overflow: 'hidden', boxSizing: 'border-box', transition: 'opacity 0.15s', zIndex: 10,
+        ...style
       }}
       onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
       onMouseLeave={e => e.currentTarget.style.opacity = '1'}
     >
-      {timeLabel && <div style={{ fontSize: '10px', letterSpacing: '0.03em', color: metaColor, lineHeight: 1, marginBottom: '2px', fontWeight: 500 }}>{timeLabel}</div>}
-      <div style={{ fontSize: '12px', fontWeight: 'bold', letterSpacing: '0.04em', color: statusDef.textColor, textTransform: 'uppercase', lineHeight: 1.3, marginBottom: '3px' }}>{session.title}</div>
-      {session.format && <div style={{ marginBottom: '2px' }}><span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '2px', background: statusDef.border + '22', color: metaColor, letterSpacing: '0.04em' }}>{session.format}</span></div>}
-      {sessionSpeakers.length > 0 && <div style={{ fontSize: '10px', color: metaColor, lineHeight: 1.3 }}>{sessionSpeakers.map(s => {
+      {timeLabel && <div style={{ fontSize: '11px', letterSpacing: '0.03em', color: metaColor, lineHeight: 1, marginBottom: dur < 20 ? '1px' : '3px', fontWeight: 500 }}>{timeLabel}</div>}
+      <div style={{ fontSize: dur < 20 ? '11px' : '13px', fontWeight: 'bold', letterSpacing: '0.04em', color: statusDef.textColor, textTransform: 'uppercase', lineHeight: 1.2, marginBottom: showFormat ? '4px' : 0, whiteSpace: dur < 20 ? 'nowrap' : undefined, overflow: dur < 20 ? 'hidden' : undefined, textOverflow: dur < 20 ? 'ellipsis' : undefined }}>{session.title}</div>
+      {showFormat && session.format && <div style={{ marginBottom: '3px' }}><span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '2px', background: leftAccent + '18', color: metaColor, letterSpacing: '0.04em' }}>{session.format}</span></div>}
+      {showSpeakers && sessionSpeakers.length > 0 && <div style={{ fontSize: '12px', color: metaColor, lineHeight: 1.3 }}>{sessionSpeakers.map(s => {
         const role = getSpeakerRole(session.speakers, s.id);
         return role === 'moderator' ? `[MOD] ${s.name}` : s.name;
       }).join(', ')}</div>}
-      {session.topics?.[0] && <div style={{ fontSize: '9px', color: topicColor, marginTop: '2px', opacity: 0.8 }}>{session.topics[0]}{session.topics[1] ? `, ${session.topics[1]}` : ''}</div>}
+      {showTopics && session.topics?.[0] && <div style={{ fontSize: '10px', color: topicColor, marginTop: '3px', opacity: 0.8 }}>{session.topics[0]}{session.topics[1] ? `, ${session.topics[1]}` : ''}</div>}
     </div>
   );
 }
@@ -580,34 +599,34 @@ function BlockCard({ session, onClick, style, onDragStart }) {
     <div draggable="true"
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
       onClick={onClick} style={{
-        position: 'absolute', left: '2px', right: '2px',
+        margin: '0 2px',
+        position: 'relative',
         background: `repeating-linear-gradient(45deg, ${bgColor}, ${bgColor} 4px, ${stripeColor}25 4px, ${stripeColor}25 8px)`,
         border: `1px dashed ${color}60`, borderRadius: '3px', padding: '3px 6px',
         cursor: 'grab', overflow: 'hidden', boxSizing: 'border-box', zIndex: 10,
-        display: 'flex', flexDirection: 'column', justifyContent: 'center', ...style,
+        display: 'flex', flexDirection: 'column', justifyContent: 'center',
+        ...style,
       }}
     >
-      {timeLabel && <div style={{ fontSize: '9px', color: `${color}99`, lineHeight: 1, marginBottom: '1px' }}>{timeLabel}</div>}
-      <div style={{ fontSize: '10px', fontWeight: 'bold', color, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, lineHeight: 1.2 }}>
-        {session.title}{session.duration_minutes > 0 ? ` · ${session.duration_minutes}m` : ''}
+      <div style={{ fontSize: '10px', fontWeight: 'bold', color, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {timeLabel && <span style={{ color: `${color}99` }}>{timeLabel} · </span>}{session.title}
       </div>
     </div>
   );
 }
 
-// ── Slot renderer (shared by single-col and multi-col stages) ─────────────────
+// ── Slot renderer (absolute positioning) ──────────────────────────────────────
 function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIndex, colWidth, isLastCol, dropError, handleDrop, onDragStart, dragSessionRef, openNewSession, onEditSession }) {
-  // Compute closed overlay regions
   const gridStart = TIME_SLOTS[0];
   const gridEnd = TIME_SLOTS[TIME_SLOTS.length - 1] + 5;
-  const closedRegions = [];
-  if (openFrom > gridStart) closedRegions.push({ start: gridStart, end: openFrom });
-  if (openUntil < gridEnd) closedRegions.push({ start: openUntil, end: gridEnd });
+  const totalHeight = TIME_SLOTS.length * SLOT_HEIGHT;
 
   return (
-    <div style={{ width: `${colWidth}px`, position: 'relative', flexShrink: 0 }}>
+    <div style={{ width: `${colWidth}px`, flexShrink: 0, position: 'relative', height: `${totalHeight}px` }}>
+      {/* Slot grid cells — drag/drop targets */}
       {TIME_SLOTS.map(mins => {
         const isOpen = mins >= openFrom && mins < openUntil;
+        const isClosed = mins < openFrom || mins >= openUntil;
         const isErr = dropError?.stageId === stage.id && dropError?.slotMins === mins && (dropError?.colIndex ?? 0) === colIndex;
         return (
           <div key={mins}
@@ -617,8 +636,10 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
             onDragLeave={isOpen ? e => { e.currentTarget.style.background = isOpen ? '#050d0d' : '#020808'; } : undefined}
             onDrop={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = '#050d0d'; handleDrop(stage.id, mins, colIndex); } : undefined}
             style={{
+              position: 'absolute', left: 0, right: 0,
+              top: `${(mins - gridStart) / 5 * SLOT_HEIGHT}px`,
               height: `${SLOT_HEIGHT}px`,
-              background: isErr ? '#3a0a0a' : (isOpen ? '#050d0d' : '#020808'),
+              background: isErr ? '#3a0a0a' : isClosed ? '#020808' : '#050d0d',
               borderBottom: mins % 60 === 0 ? '1px solid #0a1a1a' : mins % 30 === 0 ? '1px solid #081212' : 'none',
               borderRight: isLastCol ? '1px solid #0a2020' : '1px dashed #060e0e',
               cursor: isOpen ? 'cell' : 'default',
@@ -627,32 +648,47 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
           />
         );
       })}
-      {/* Stage closed overlays */}
-      {closedRegions.map(({ start, end }) => {
-        const topOffset = (start - gridStart) / 5 * SLOT_HEIGHT;
-        const height = (end - start) / 5 * SLOT_HEIGHT;
-        return (
-          <div key={`closed-${start}`} style={{
-            position: 'absolute', left: 0, right: 0,
-            top: `${topOffset}px`, height: `${height}px`,
-            background: 'repeating-linear-gradient(45deg, #111 0px, #111 8px, #0a0a0a 8px, #0a0a0a 16px)',
-            zIndex: 5, pointerEvents: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            overflow: 'hidden',
-          }}>
-            <span style={{
-              fontSize: '11px', color: '#2a2a2a', letterSpacing: '0.2em',
-              fontWeight: 'bold', textTransform: 'uppercase',
-              writingMode: 'vertical-rl', whiteSpace: 'nowrap',
-            }}>STAGE CLOSED</span>
-          </div>
-        );
-      })}
-      {stageSessions.map(session => {
+
+      {/* Closed region overlays */}
+      {openFrom > gridStart && (
+        <div style={{
+          position: 'absolute', left: 0, right: 0, top: 0,
+          height: `${(openFrom - gridStart) / 5 * SLOT_HEIGHT}px`,
+          background: 'repeating-linear-gradient(45deg, #111111 0px, #111111 6px, #0e0e0e 6px, #0e0e0e 12px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden', borderBottom: '1px solid #333333', zIndex: 5,
+          borderRight: isLastCol ? '1px solid #0a2020' : '1px dashed #060e0e',
+        }}>
+          <span style={{ fontSize: '11px', color: '#444444', letterSpacing: '0.2em', fontWeight: 'bold', textTransform: 'uppercase', writingMode: 'vertical-rl', whiteSpace: 'nowrap' }}>STAGE CLOSED</span>
+        </div>
+      )}
+      {openUntil < gridEnd && (
+        <div style={{
+          position: 'absolute', left: 0, right: 0,
+          top: `${(openUntil - gridStart) / 5 * SLOT_HEIGHT}px`,
+          height: `${(gridEnd - openUntil) / 5 * SLOT_HEIGHT}px`,
+          background: 'repeating-linear-gradient(45deg, #111111 0px, #111111 6px, #0e0e0e 6px, #0e0e0e 12px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          overflow: 'hidden', borderTop: '1px solid #333333', zIndex: 5,
+          borderRight: isLastCol ? '1px solid #0a2020' : '1px dashed #060e0e',
+        }}>
+          <span style={{ fontSize: '11px', color: '#444444', letterSpacing: '0.2em', fontWeight: 'bold', textTransform: 'uppercase', writingMode: 'vertical-rl', whiteSpace: 'nowrap' }}>STAGE CLOSED</span>
+        </div>
+      )}
+
+      {/* Session and block cards — absolute positioned */}
+      {stageSessions.filter(s => {
+        const sm = isoToMinutes(s.start_time);
+        return sm >= gridStart && sm < gridEnd;
+      }).map(session => {
         const startMins = isoToMinutes(session.start_time);
-        const topOffset = (startMins - gridStart) / 5 * SLOT_HEIGHT;
-        const height = Math.max((session.duration_minutes / 5) * SLOT_HEIGHT - 2, session.duration_minutes === 0 ? 8 : 20);
-        const cardStyle = { top: `${topOffset}px`, height: `${height}px` };
+        const slotH = (session.duration_minutes / 5) * SLOT_HEIGHT;
+        const top = (startMins - gridStart) / 5 * SLOT_HEIGHT;
+        const cardStyle = {
+          position: 'absolute', left: 0, right: 0,
+          top: `${top}px`, height: `${slotH}px`,
+          overflow: 'hidden', zIndex: 10,
+        };
         if (session.type === 'block') {
           return <BlockCard key={session.id} session={session} onClick={() => onEditSession(session)} onDragStart={onDragStart} style={cardStyle} />;
         }
@@ -732,6 +768,7 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                     );
                   }
                   const rtMetaColor = session.status === 'confirmed' ? '#7ae8e8' : '#4a8a8a';
+                  const rtLeftAccent = session.status === 'confirmed' ? '#0CEBF1' : topicColor;
                   return (
                     <div key={colIdx} draggable="true"
                       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(session); }}
@@ -739,15 +776,18 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                       style={{
                         width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '4px', cursor: 'grab',
                         background: statusDef.color,
-                        border: `1px solid ${statusDef.border}`, borderLeft: `4px solid ${session.status === 'confirmed' ? '#0CEBF1' : topicColor}`,
+                        borderTop: `1px solid ${statusDef.border}`,
+                        borderRight: `1px solid ${statusDef.border}`,
+                        borderBottom: `1px solid ${statusDef.border}`,
+                        borderLeft: `3px solid ${rtLeftAccent}`,
                         transition: 'opacity 0.15s',
                       }}
                       onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
                       onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                     >
-                      <div style={{ fontSize: '12px', fontWeight: 'bold', color: statusDef.textColor, textTransform: 'uppercase', lineHeight: 1.3, marginBottom: '4px', letterSpacing: '0.04em' }}>{session.title}</div>
-                      {session.format && <div style={{ marginBottom: '3px' }}><span style={{ fontSize: '9px', padding: '1px 5px', borderRadius: '2px', background: statusDef.border + '22', color: rtMetaColor }}>{session.format}</span></div>}
-                      {sessionSpeakers.length > 0 && <div style={{ fontSize: '10px', color: rtMetaColor, lineHeight: 1.3 }}>{sessionSpeakers.map(s => {
+                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: statusDef.textColor, textTransform: 'uppercase', lineHeight: 1.3, marginBottom: '4px', letterSpacing: '0.04em' }}>{session.title}</div>
+                      {session.format && <div style={{ marginBottom: '3px' }}><span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '2px', background: rtLeftAccent + '18', color: rtMetaColor }}>{session.format}</span></div>}
+                      {sessionSpeakers.length > 0 && <div style={{ fontSize: '12px', color: rtMetaColor, lineHeight: 1.3 }}>{sessionSpeakers.map(s => {
                         const role = getSpeakerRole(session.speakers, s.id);
                         return role === 'moderator' ? `[MOD] ${s.name}` : s.name;
                       }).join(', ')}</div>}
@@ -783,6 +823,193 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
   );
 }
 
+// ── Registrations Modal ───────────────────────────────────────────────────────
+function RegistrationsModal({ isOpen, onClose, sessions, stages }) {
+  const [attendees, setAttendees] = useState([]);
+  const [rtRegistrations, setRtRegistrations] = useState([]);
+  const [questSaves, setQuestSaves] = useState([]);
+  const [loadingReg, setLoadingReg] = useState(false);
+  const [expandedSession, setExpandedSession] = useState(null);
+  const [expandedAttendees, setExpandedAttendees] = useState([]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoadingReg(true);
+    Promise.all([
+      supabase.from('attendees').select('*').order('created_at', { ascending: false }),
+      supabase.from('roundtable_registrations').select('*'),
+      supabase.from('quest_saves').select('*'),
+    ]).then(([aRes, rtRes, qRes]) => {
+      if (aRes.data) setAttendees(aRes.data);
+      if (rtRes.data) setRtRegistrations(rtRes.data);
+      if (qRes.data) setQuestSaves(qRes.data);
+      setLoadingReg(false);
+    });
+  }, [isOpen]);
+
+  const expandRoundtable = async (sessionId) => {
+    if (expandedSession === sessionId) {
+      setExpandedSession(null);
+      return;
+    }
+    setExpandedSession(sessionId);
+    const regs = rtRegistrations.filter(r => r.session_id === sessionId);
+    const attendeeIds = regs.map(r => r.attendee_id);
+    const matched = attendees.filter(a => attendeeIds.includes(a.id)).map(a => {
+      const reg = regs.find(r => r.attendee_id === a.id);
+      return { ...a, registered_at: reg?.created_at };
+    });
+    setExpandedAttendees(matched);
+  };
+
+  if (!isOpen) return null;
+
+  // Roundtable sessions (from multi-column stages)
+  const roundtableStageIds = new Set(stages.filter(s => (s.max_columns || 1) > 1).map(s => s.id));
+  const roundtableSessions = sessions.filter(s =>
+    roundtableStageIds.has(s.stage_id) && s.status === 'confirmed' && s.type !== 'block'
+  );
+
+  const rtCountMap = {};
+  rtRegistrations.forEach(r => {
+    rtCountMap[r.session_id] = (rtCountMap[r.session_id] || 0) + 1;
+  });
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 1000,
+      background: 'rgba(0,0,0,0.8)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', padding: '24px',
+    }} onClick={onClose}>
+      <div style={{
+        background: '#020808', border: '1px solid #0a2a2a', borderRadius: '4px',
+        width: '640px', maxWidth: '100%', maxHeight: '80vh', overflow: 'auto',
+        padding: '24px',
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+          <h2 style={{ fontSize: '14px', color: '#0CEBF1', margin: 0, letterSpacing: '0.1em' }}>REGISTRATIONS</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4a6a6a', cursor: 'pointer', fontSize: '18px' }}>&times;</button>
+        </div>
+
+        {loadingReg ? (
+          <div style={{ color: '#4a6a6a', textAlign: 'center', padding: '40px 0' }}>Loading...</div>
+        ) : (
+          <>
+            {/* Summary stats */}
+            <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', padding: '16px', background: '#0a1212', borderRadius: '4px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0CEBF1' }}>{attendees.length}</div>
+                <div style={{ fontSize: '9px', color: '#4a6a6a', letterSpacing: '0.1em', marginTop: '4px' }}>ATTENDEES</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#22c55e' }}>{rtRegistrations.length}</div>
+                <div style={{ fontSize: '9px', color: '#4a6a6a', letterSpacing: '0.1em', marginTop: '4px' }}>RT SIGNUPS</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#FFFBC9' }}>{questSaves.length}</div>
+                <div style={{ fontSize: '9px', color: '#4a6a6a', letterSpacing: '0.1em', marginTop: '4px' }}>QUEST SAVES</div>
+              </div>
+            </div>
+
+            {/* Roundtable sessions with registration counts */}
+            <h3 style={{ fontSize: '11px', color: '#e0f0f0', margin: '0 0 12px', letterSpacing: '0.1em' }}>ROUNDTABLE REGISTRATIONS</h3>
+            {roundtableSessions.length === 0 ? (
+              <div style={{ color: '#4a6a6a', fontSize: '12px', marginBottom: '24px' }}>No roundtable sessions found.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
+                {roundtableSessions.map(s => {
+                  const count = rtCountMap[s.id] || 0;
+                  const cap = s.capacity;
+                  const pct = cap ? Math.min(100, (count / cap) * 100) : 0;
+                  const isExpanded = expandedSession === s.id;
+                  return (
+                    <div key={s.id}>
+                      <div
+                        onClick={() => expandRoundtable(s.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '12px',
+                          padding: '10px 12px', background: '#0a1212',
+                          borderRadius: '4px', cursor: 'pointer',
+                          border: isExpanded ? '1px solid #0CEBF1' : '1px solid transparent',
+                          transition: 'border-color 0.15s',
+                        }}
+                      >
+                        <span style={{ flex: 1, fontSize: '12px', color: '#e0f0f0' }}>{s.title}</span>
+                        <span style={{ fontSize: '11px', color: count >= (cap || Infinity) ? '#f87171' : '#22c55e', fontWeight: 'bold' }}>
+                          {count}{cap ? `/${cap}` : ''}
+                        </span>
+                        {cap && (
+                          <div style={{ width: '60px', height: '4px', background: '#1a2a2a', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{ width: `${pct}%`, height: '100%', background: pct >= 100 ? '#f87171' : '#22c55e' }} />
+                          </div>
+                        )}
+                        <span style={{ fontSize: '10px', color: '#4a6a6a' }}>{isExpanded ? '\u25B2' : '\u25BC'}</span>
+                      </div>
+                      {isExpanded && (
+                        <div style={{ padding: '8px 12px 8px 24px', background: '#060e0e', borderRadius: '0 0 4px 4px' }}>
+                          {expandedAttendees.length === 0 ? (
+                            <div style={{ fontSize: '11px', color: '#4a6a6a' }}>No registrations yet.</div>
+                          ) : (
+                            <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
+                              <thead>
+                                <tr style={{ color: '#4a6a6a' }}>
+                                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 'normal', letterSpacing: '0.05em' }}>NAME</th>
+                                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 'normal', letterSpacing: '0.05em' }}>EMAIL</th>
+                                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 'normal', letterSpacing: '0.05em' }}>COMPANY</th>
+                                  <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 'normal', letterSpacing: '0.05em' }}>REGISTERED</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {expandedAttendees.map(a => (
+                                  <tr key={a.id}>
+                                    <td style={{ padding: '4px 8px', color: '#FFFBC9' }}>{a.name}</td>
+                                    <td style={{ padding: '4px 8px', color: '#e0f0f0' }}>{a.email}</td>
+                                    <td style={{ padding: '4px 8px', color: '#4a6a6a' }}>{a.company || '—'}</td>
+                                    <td style={{ padding: '4px 8px', color: '#4a6a6a' }}>
+                                      {a.registered_at ? new Date(a.registered_at).toLocaleDateString() : '—'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Recent attendees list */}
+            <h3 style={{ fontSize: '11px', color: '#e0f0f0', margin: '0 0 12px', letterSpacing: '0.1em' }}>RECENT ATTENDEES</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              {attendees.slice(0, 50).map(a => (
+                <div key={a.id} style={{
+                  display: 'flex', gap: '12px', padding: '6px 12px',
+                  fontSize: '11px', background: '#0a1212', borderRadius: '2px',
+                }}>
+                  <span style={{ color: '#FFFBC9', minWidth: '120px' }}>{a.name}</span>
+                  <span style={{ color: '#e0f0f0', flex: 1 }}>{a.email}</span>
+                  <span style={{ color: '#4a6a6a' }}>{a.company || ''}</span>
+                  <span style={{ color: '#2a4a4a', fontSize: '10px' }}>
+                    {new Date(a.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+              {attendees.length > 50 && (
+                <div style={{ fontSize: '10px', color: '#4a6a6a', padding: '8px 12px' }}>
+                  + {attendees.length - 50} more attendees
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function NerdConPlanner() {
   const [sessions, setSessions] = useState([]);
@@ -797,6 +1024,7 @@ export default function NerdConPlanner() {
   const dragSessionRef = useRef(null);
   const [dropError, setDropError] = useState(null);
   const [pendingBlock, setPendingBlock] = useState(null);
+  const [showRegistrations, setShowRegistrations] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -960,6 +1188,7 @@ export default function NerdConPlanner() {
             </div>
           ))}
           <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#0CEBF1', border: 'none', borderRadius: '4px', padding: '0 16px', color: '#001a1a', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold', letterSpacing: '0.05em', height: '32px' }}>+ NEW</button>
+          <button onClick={() => setShowRegistrations(true)} style={{ background: 'none', border: '1px solid #0a2a2a', borderRadius: '4px', padding: '0 12px', color: '#4a6a6a', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Registrations">{'\u{1F465}'}</button>
           <button onClick={() => setShowStagesModal(true)} style={{ background: 'none', border: '1px solid #0a2a2a', borderRadius: '4px', padding: '0 12px', color: '#4a6a6a', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Manage Stages">{'⚙'}</button>
           <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'none', border: '1px solid #0a2a2a', borderRadius: '4px', padding: '0 16px', color: '#4a6a6a', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', letterSpacing: '0.05em', textDecoration: 'none', display: 'flex', alignItems: 'center', height: '32px' }}>VIEW &#8599;</a>
         </div>
@@ -998,7 +1227,7 @@ export default function NerdConPlanner() {
                         {hall.stages.map(stage => {
                           const maxCols = stage.max_columns || 1;
                           return (
-                            <div key={stage.id} style={{ width: `${STAGE_COL_WIDTH * maxCols}px`, height: '44px', padding: '0 8px', borderBottom: `2px solid ${stage.color}`, borderRight: '1px solid #0a2020', display: 'flex', flexDirection: 'column', justifyContent: 'center', background: '#020f0f', boxSizing: 'border-box' }}>
+                            <div key={stage.id} style={{ width: `${STAGE_COL_WIDTH * maxCols}px`, height: '44px', padding: '0 8px', borderBottom: `2px solid ${stage.color}`, borderRight: '1px solid #0a2020', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: '#020f0f', boxSizing: 'border-box' }}>
                               <div style={{ fontSize: '11px', color: stage.color, fontWeight: 'bold', letterSpacing: '0.05em' }}>{stage.name}</div>
                               <div style={{ fontSize: '9px', color: '#2a4a4a' }}>{stage.open_from}–{stage.open_until}{maxCols > 1 ? ` · ${maxCols}col` : ''}</div>
                             </div>
@@ -1087,6 +1316,8 @@ export default function NerdConPlanner() {
         onSave={handleSave} onDelete={handleDelete} editingSession={editingSession} speakers={speakers} stages={stages} selectedDay={selectedDay} />
 
       <ManageStagesModal isOpen={showStagesModal} onClose={() => setShowStagesModal(false)} stages={stages} onStagesChange={setStages} />
+
+      <RegistrationsModal isOpen={showRegistrations} onClose={() => setShowRegistrations(false)} sessions={sessions} stages={stages} />
 
       {pendingBlock && <BlockDurationPopup pending={pendingBlock} onConfirm={handleBlockConfirm} onCancel={() => setPendingBlock(null)} />}
     </div>
