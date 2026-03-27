@@ -16,7 +16,7 @@ const DAYS = [
 const SESSION_STATUSES = [
   { id: 'placeholder', label: 'Placeholder', color: '#080808', border: '#1a1a1a', textColor: '#333333', borderStyle: 'dashed', borderWidth: '1px' },
   { id: 'pencilled', label: 'Pencilled', color: '#1a1200', border: '#d97706', textColor: '#fbbf24', borderStyle: 'solid', borderWidth: '2px' },
-  { id: 'confirmed', label: 'Confirmed', color: '#0a0a0a', border: '#222222', textColor: '#ffffff', borderStyle: 'solid', borderWidth: '1px' },
+  { id: 'confirmed', label: 'Confirmed', color: '#0a0a0a', border: '#3568FF', textColor: '#ffffff', borderStyle: 'solid', borderWidth: '1px' },
 ];
 
 const BLOCK_TYPES = [
@@ -53,19 +53,19 @@ function checkOverlap(sessions, stageId, day, startMins, durationMins, excludeId
 
 // ── Modal shell (reused) ──────────────────────────────────────────────────────
 const ModalShell = ({ children, onClose, title, width = '640px' }) => (
-  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
-    <div style={{ background: '#0a0f0f', border: '1px solid #0CEBF1', borderRadius: '8px', width: '100%', maxWidth: width, maxHeight: '90vh', overflowY: 'auto', fontFamily: "'Space Mono', monospace" }}>
-      <div style={{ padding: '20px 24px', borderBottom: '1px solid #1a2a2a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0, color: '#0CEBF1', fontSize: '16px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{title}</h2>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4a6a6a', cursor: 'pointer', fontSize: '20px' }}>×</button>
+  <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '16px' }}>
+    <div style={{ background: 'rgb(13,13,13)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px', boxShadow: '0 0 20px rgba(53,104,255,0.3)', width: '100%', maxWidth: width, maxHeight: '90vh', overflowY: 'auto', fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+      <div style={{ padding: '20px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <h2 style={{ margin: 0, color: '#3568FF', fontSize: '16px', letterSpacing: '0.1em', textTransform: 'uppercase' }}>{title}</h2>
+        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '20px' }}>×</button>
       </div>
       {children}
     </div>
   </div>
 );
 
-const inputStyle = { width: '100%', background: '#0f1a1a', border: '1px solid #1a3a3a', borderRadius: '4px', padding: '8px 12px', color: '#e0f0f0', fontSize: '14px', boxSizing: 'border-box', fontFamily: "'Space Mono', monospace" };
-const labelStyle = { display: 'block', color: '#4a6a6a', fontSize: '11px', letterSpacing: '0.1em', marginBottom: '6px', textTransform: 'uppercase' };
+const inputStyle = { width: '100%', background: 'rgb(18,18,18)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 12px', color: 'rgb(240,240,240)', fontSize: '14px', boxSizing: 'border-box', fontFamily: "'JetBrains Mono', ui-monospace, monospace" };
+const labelStyle = { display: 'block', color: 'rgba(240,240,240,0.4)', fontSize: '11px', letterSpacing: '0.1em', marginBottom: '6px', textTransform: 'uppercase' };
 
 // ── Session Modal ─────────────────────────────────────────────────────────────
 // Helper to normalize speakers from old flat array or new object format
@@ -176,9 +176,9 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
               {SESSION_STATUSES.map(s => (
                 <button key={s.id} onClick={() => setStatus(s.id)} style={{
                   flex: 1, padding: '8px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit',
-                  background: status === s.id ? s.color : '#0f1a1a',
-                  border: `1px solid ${status === s.id ? s.border : '#1a3a3a'}`,
-                  color: status === s.id ? s.textColor : '#4a6a6a', letterSpacing: '0.05em'
+                  background: status === s.id ? s.color : 'rgb(18,18,18)',
+                  border: `1px solid ${status === s.id ? s.border : 'rgba(255,255,255,0.08)'}`,
+                  color: status === s.id ? s.textColor : 'rgba(240,240,240,0.4)', letterSpacing: '0.05em'
                 }}>{s.label}</button>
               ))}
             </div>
@@ -227,9 +227,9 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                 {TOPIC_TAGS.map(t => (
                   <button key={t} onClick={() => setTopics(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t])} style={{
                     padding: '4px 10px', borderRadius: '20px', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit',
-                    background: topics.includes(t) ? (TOPIC_TAG_COLORS[t] || '#0CEBF1') + '33' : '#0f1a1a',
-                    border: `1px solid ${topics.includes(t) ? (TOPIC_TAG_COLORS[t] || '#0CEBF1') : '#1a3a3a'}`,
-                    color: topics.includes(t) ? (TOPIC_TAG_COLORS[t] || '#0CEBF1') : '#4a6a6a',
+                    background: topics.includes(t) ? (TOPIC_TAG_COLORS[t] || '#3568FF') + '33' : 'rgb(18,18,18)',
+                    border: `1px solid ${topics.includes(t) ? (TOPIC_TAG_COLORS[t] || '#3568FF') : 'rgba(255,255,255,0.08)'}`,
+                    color: topics.includes(t) ? (TOPIC_TAG_COLORS[t] || '#3568FF') : 'rgba(240,240,240,0.4)',
                   }}>{t}</button>
                 ))}
               </div>
@@ -243,8 +243,8 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                   return (
                     <div key={sp.id} style={{
                       display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 10px',
-                      background: isSelected ? '#0f2a2a' : '#0f1a1a',
-                      border: `1px solid ${isSelected ? '#0CEBF1' : '#1a3a3a'}`,
+                      background: isSelected ? 'rgba(53,104,255,0.1)' : 'rgb(18,18,18)',
+                      border: `1px solid ${isSelected ? '#3568FF' : 'rgba(255,255,255,0.08)'}`,
                       borderRadius: '4px', cursor: 'pointer'
                     }}>
                       <input type="checkbox" checked={isSelected} onChange={() => {
@@ -252,10 +252,10 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                           ? prev.filter(s => s.speaker_id !== sp.id)
                           : [...prev, { speaker_id: sp.id, role: 'speaker' }]
                         );
-                      }} style={{ accentColor: '#0CEBF1', flexShrink: 0 }} />
+                      }} style={{ accentColor: '#3568FF', flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ color: '#e0f0f0', fontSize: '13px' }}>{sp.name}</div>
-                        <div style={{ color: '#4a6a6a', fontSize: '11px' }}>{sp.title} · {sp.company}</div>
+                        <div style={{ color: 'rgb(240,240,240)', fontSize: '13px' }}>{sp.name}</div>
+                        <div style={{ color: 'rgba(240,240,240,0.4)', fontSize: '11px' }}>{sp.title} · {sp.company}</div>
                       </div>
                       {isSelected && (
                         <button onClick={(e) => {
@@ -264,10 +264,10 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                             s.speaker_id === sp.id ? { ...s, role: s.role === 'moderator' ? 'speaker' : 'moderator' } : s
                           ));
                         }} style={{
-                          background: entry.role === 'moderator' ? '#f59e0b33' : '#0f1a1a',
-                          border: `1px solid ${entry.role === 'moderator' ? '#f59e0b' : '#1a3a3a'}`,
+                          background: entry.role === 'moderator' ? '#f59e0b33' : 'rgb(18,18,18)',
+                          border: `1px solid ${entry.role === 'moderator' ? '#f59e0b' : 'rgba(255,255,255,0.08)'}`,
                           borderRadius: '3px', padding: '2px 8px', cursor: 'pointer', fontSize: '9px',
-                          color: entry.role === 'moderator' ? '#f59e0b' : '#4a6a6a',
+                          color: entry.role === 'moderator' ? '#f59e0b' : 'rgba(240,240,240,0.4)',
                           letterSpacing: '0.05em', fontFamily: 'inherit', flexShrink: 0,
                         }}>
                           {entry.role === 'moderator' ? 'MOD' : 'SPK'}
@@ -279,22 +279,22 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
               </div>
               {/* Collapsible Add Speaker Form */}
               <button onClick={() => setShowAddSpk(prev => !prev)} style={{
-                marginTop: '10px', background: 'none', border: `1px dashed #1a3a3a`, borderRadius: '6px',
+                marginTop: '10px', background: 'none', border: `1px dashed rgba(255,255,255,0.08)`, borderRadius: '6px',
                 padding: '8px 12px', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit',
-                color: '#4a6a6a', letterSpacing: '0.05em', textTransform: 'uppercase', width: '100%', textAlign: 'left',
+                color: 'rgba(240,240,240,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase', width: '100%', textAlign: 'left',
               }}>
                 {showAddSpk ? '▾' : '▸'} Add new speaker
               </button>
               {showAddSpk && (
-                <div style={{ marginTop: '6px', padding: '10px', background: '#0a1212', border: '1px solid #1a3a3a', borderRadius: '6px' }}>
+                <div style={{ marginTop: '6px', padding: '10px', background: 'rgb(13,13,13)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
                     <input value={newSpkName} onChange={e => setNewSpkName(e.target.value)} placeholder="Name *" style={inputStyle} />
                     <input value={newSpkTitle} onChange={e => setNewSpkTitle(e.target.value)} placeholder="Title" style={inputStyle} />
                     <input value={newSpkCompany} onChange={e => setNewSpkCompany(e.target.value)} placeholder="Company" style={inputStyle} />
                   </div>
                   <button onClick={handleAddSpeaker} disabled={!newSpkName.trim() || addingSpk} style={{
-                    marginTop: '8px', background: newSpkName.trim() ? '#0CEBF1' : '#1a2a2a', border: 'none', borderRadius: '4px',
-                    padding: '6px 16px', color: newSpkName.trim() ? '#001a1a' : '#4a6a6a', cursor: newSpkName.trim() ? 'pointer' : 'default',
+                    marginTop: '8px', background: newSpkName.trim() ? '#3568FF' : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '4px',
+                    padding: '6px 16px', color: newSpkName.trim() ? '#fff' : 'rgba(240,240,240,0.4)', cursor: newSpkName.trim() ? 'pointer' : 'default',
                     fontSize: '11px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.03em',
                   }}>{addingSpk ? 'Adding…' : 'Add Speaker'}</button>
                 </div>
@@ -316,15 +316,15 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
         </div>
       </div>
 
-      <div style={{ padding: '16px 24px', borderTop: '1px solid #1a2a2a', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           {editingSession && (
             <button onClick={() => { onDelete(editingSession.id); onClose(); }} style={{ background: 'none', border: '1px solid #3a1a1a', borderRadius: '4px', padding: '8px 16px', color: '#f87171', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>Delete</button>
           )}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={onClose} style={{ background: 'none', border: '1px solid #1a3a3a', borderRadius: '4px', padding: '8px 16px', color: '#4a6a6a', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>Cancel</button>
-          <button onClick={handleSave} style={{ background: '#0CEBF1', border: 'none', borderRadius: '4px', padding: '8px 20px', color: '#001a1a', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold' }}>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 16px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>Cancel</button>
+          <button onClick={handleSave} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '8px 20px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold' }}>
             {editingSession ? 'Save Changes' : 'Create Session'}
           </button>
         </div>
@@ -338,7 +338,7 @@ function ManageStagesModal({ isOpen, onClose, stages, onStagesChange }) {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({});
   const [addMode, setAddMode] = useState(false);
-  const [newStage, setNewStage] = useState({ name: '', hall_id: 'hall-1', hall_name: 'Hall 1', open_from: '09:00', open_until: '17:00', color: '#0CEBF1', max_columns: 1 });
+  const [newStage, setNewStage] = useState({ name: '', hall_id: 'hall-1', hall_name: 'Hall 1', open_from: '09:00', open_until: '17:00', color: '#3568FF', max_columns: 1 });
   const dragIdx = useRef(null);
 
   const existingHalls = useMemo(() => {
@@ -370,7 +370,7 @@ function ManageStagesModal({ isOpen, onClose, stages, onStagesChange }) {
     if (error) { alert(error.message); return; }
     onStagesChange([...stages, data[0]]);
     setAddMode(false);
-    setNewStage({ name: '', hall_id: 'hall-1', hall_name: 'Hall 1', open_from: '09:00', open_until: '17:00', color: '#0CEBF1', max_columns: 1 });
+    setNewStage({ name: '', hall_id: 'hall-1', hall_name: 'Hall 1', open_from: '09:00', open_until: '17:00', color: '#3568FF', max_columns: 1 });
   };
 
   const handleReorderDrop = async (targetIdx) => {
@@ -438,26 +438,26 @@ function ManageStagesModal({ isOpen, onClose, stages, onStagesChange }) {
             onDragOver={e => e.preventDefault()}
             onDrop={() => handleReorderDrop(idx)}
             style={{
-              border: '1px solid #1a3a3a', borderRadius: '4px', marginBottom: '8px',
-              background: '#0f1a1a', padding: '10px 12px',
+              border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', marginBottom: '8px',
+              background: 'rgb(18,18,18)', padding: '10px 12px',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ cursor: 'grab', color: '#4a6a6a', fontSize: '14px' }}>☰</span>
+              <span style={{ cursor: 'grab', color: 'rgba(240,240,240,0.4)', fontSize: '14px' }}>☰</span>
               <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: stage.color, flexShrink: 0 }} />
-              <span style={{ flex: 1, color: '#e0f0f0', fontSize: '13px', fontWeight: 'bold' }}>{stage.name}</span>
-              <span style={{ color: '#4a6a6a', fontSize: '10px' }}>{stage.hall_name}</span>
-              <span style={{ color: '#4a6a6a', fontSize: '10px' }}>{stage.open_from}–{stage.open_until}</span>
-              {stage.max_columns > 1 && <span style={{ color: '#4a6a6a', fontSize: '10px' }}>{stage.max_columns}col</span>}
-              <button onClick={() => { setEditingId(stage.id); setForm({ name: stage.name, hall_id: stage.hall_id, hall_name: stage.hall_name, open_from: stage.open_from, open_until: stage.open_until, color: stage.color, max_columns: stage.max_columns }); }} style={{ background: 'none', border: '1px solid #1a3a3a', borderRadius: '3px', padding: '3px 8px', color: '#0CEBF1', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}>Edit</button>
+              <span style={{ flex: 1, color: 'rgb(240,240,240)', fontSize: '13px', fontWeight: 'bold' }}>{stage.name}</span>
+              <span style={{ color: 'rgba(240,240,240,0.4)', fontSize: '10px' }}>{stage.hall_name}</span>
+              <span style={{ color: 'rgba(240,240,240,0.4)', fontSize: '10px' }}>{stage.open_from}–{stage.open_until}</span>
+              {stage.max_columns > 1 && <span style={{ color: 'rgba(240,240,240,0.4)', fontSize: '10px' }}>{stage.max_columns}col</span>}
+              <button onClick={() => { setEditingId(stage.id); setForm({ name: stage.name, hall_id: stage.hall_id, hall_name: stage.hall_name, open_from: stage.open_from, open_until: stage.open_until, color: stage.color, max_columns: stage.max_columns }); }} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '3px', padding: '3px 8px', color: '#3568FF', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}>Edit</button>
               <button onClick={() => deleteStage(stage.id)} style={{ background: 'none', border: '1px solid #3a1a1a', borderRadius: '3px', padding: '3px 8px', color: '#f87171', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit' }}>×</button>
             </div>
             {editingId === stage.id && (
-              <div style={{ marginTop: '10px', borderTop: '1px solid #1a3a3a', paddingTop: '10px' }}>
+              <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '10px' }}>
                 {stageForm(form, setForm)}
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
-                  <button onClick={() => setEditingId(null)} style={{ background: 'none', border: '1px solid #1a3a3a', borderRadius: '4px', padding: '6px 12px', color: '#4a6a6a', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit' }}>Cancel</button>
-                  <button onClick={saveEdit} style={{ background: '#0CEBF1', border: 'none', borderRadius: '4px', padding: '6px 12px', color: '#001a1a', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', fontWeight: 'bold' }}>Save</button>
+                  <button onClick={() => setEditingId(null)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '6px 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit' }}>Cancel</button>
+                  <button onClick={saveEdit} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '6px 12px', color: '#fff', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', fontWeight: 'bold' }}>Save</button>
                 </div>
               </div>
             )}
@@ -465,15 +465,15 @@ function ManageStagesModal({ isOpen, onClose, stages, onStagesChange }) {
         ))}
 
         {addMode ? (
-          <div style={{ border: '1px solid #0CEBF1', borderRadius: '4px', padding: '12px', background: '#0f1a1a' }}>
+          <div style={{ border: '1px solid #3568FF', borderRadius: '4px', padding: '12px', background: 'rgb(18,18,18)' }}>
             {stageForm(newStage, setNewStage)}
             <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
-              <button onClick={() => setAddMode(false)} style={{ background: 'none', border: '1px solid #1a3a3a', borderRadius: '4px', padding: '6px 12px', color: '#4a6a6a', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={addStage} style={{ background: '#0CEBF1', border: 'none', borderRadius: '4px', padding: '6px 12px', color: '#001a1a', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', fontWeight: 'bold' }}>Add Stage</button>
+              <button onClick={() => setAddMode(false)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '6px 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit' }}>Cancel</button>
+              <button onClick={addStage} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '6px 12px', color: '#fff', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', fontWeight: 'bold' }}>Add Stage</button>
             </div>
           </div>
         ) : (
-          <button onClick={() => setAddMode(true)} style={{ width: '100%', padding: '10px', background: 'none', border: '1px dashed #1a3a3a', borderRadius: '4px', color: '#0CEBF1', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', marginTop: '4px' }}>+ Add Stage</button>
+          <button onClick={() => setAddMode(true)} style={{ width: '100%', padding: '10px', background: 'none', border: '1px dashed rgba(255,255,255,0.08)', borderRadius: '4px', color: '#3568FF', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', marginTop: '4px' }}>+ Add Stage</button>
         )}
       </div>
     </ModalShell>
@@ -485,13 +485,13 @@ function BlockDurationPopup({ pending, onConfirm, onCancel }) {
   const [duration, setDuration] = useState(pending.defaultDuration);
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1001, padding: '16px' }}>
-      <div style={{ background: '#0a0f0f', border: `1px solid ${pending.color}`, borderRadius: '8px', padding: '24px', width: '280px', fontFamily: "'Space Mono', monospace" }}>
+      <div style={{ background: 'rgb(13,13,13)', border: `1px solid ${pending.color}`, borderRadius: '8px', padding: '24px', width: '280px', fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
         <div style={{ fontSize: '13px', fontWeight: 'bold', color: pending.color, letterSpacing: '0.1em', marginBottom: '16px', textTransform: 'uppercase' }}>{pending.label}</div>
         <label style={labelStyle}>Duration (minutes)</label>
         <input type="number" value={duration} min={0} step={5} onChange={e => setDuration(Number(e.target.value))} style={inputStyle} autoFocus />
         <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
-          <button onClick={onCancel} style={{ background: 'none', border: '1px solid #1a3a3a', borderRadius: '4px', padding: '8px 14px', color: '#4a6a6a', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>Cancel</button>
-          <button onClick={() => onConfirm(duration)} style={{ background: pending.color, border: 'none', borderRadius: '4px', padding: '8px 14px', color: '#001a1a', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold' }}>Add Block</button>
+          <button onClick={onCancel} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 14px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>Cancel</button>
+          <button onClick={() => onConfirm(duration)} style={{ background: pending.color, border: 'none', borderRadius: '4px', padding: '8px 14px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold' }}>Add Block</button>
         </div>
       </div>
     </div>
@@ -519,7 +519,7 @@ function BlockSidebarItem({ block, onDragStart }) {
       onMouseLeave={e => e.currentTarget.style.opacity = '1'}
     >
       {block.label}
-      <span style={{ color: '#4a6a6a', fontWeight: 'normal' }}>
+      <span style={{ color: 'rgba(240,240,240,0.4)', fontWeight: 'normal' }}>
         {block.defaultDuration > 0 ? `${block.defaultDuration}m` : 'marker'}
       </span>
     </div>
@@ -561,28 +561,28 @@ function SidebarPanel({ sessions, speakers, selectedDay, onEdit, onDragStart, is
   const scheduled = sessions.filter(s => s.stage_id && s.day && s.day === selectedDay && s.type !== 'block');
 
   return (
-    <div style={{ width: isOpen ? `${SIDEBAR_WIDTH}px` : '28px', flexShrink: 0, background: '#020f0f', borderRight: '1px solid #0a2020', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease', overflow: 'hidden' }}>
-      <div style={{ padding: '12px 0', display: 'flex', justifyContent: isOpen ? 'space-between' : 'center', alignItems: 'center', borderBottom: '1px solid #0a2020', flexShrink: 0, minWidth: isOpen ? `${SIDEBAR_WIDTH}px` : '28px' }}>
-        {isOpen && <span style={{ fontSize: '11px', color: '#0CEBF1', letterSpacing: '0.15em', fontWeight: 'bold', textTransform: 'uppercase', paddingLeft: '16px', whiteSpace: 'nowrap' }}>Sessions</span>}
-        <button onClick={onToggle} style={{ background: 'none', border: 'none', color: '#0CEBF1', cursor: 'pointer', fontSize: '14px', padding: '4px 8px', fontFamily: 'inherit' }}>{isOpen ? '◂' : '▸'}</button>
+    <div style={{ width: isOpen ? `${SIDEBAR_WIDTH}px` : '28px', flexShrink: 0, background: 'rgb(8,8,8)', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', transition: 'width 0.2s ease', overflow: 'hidden' }}>
+      <div style={{ padding: '12px 0', display: 'flex', justifyContent: isOpen ? 'space-between' : 'center', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.06)', flexShrink: 0, minWidth: isOpen ? `${SIDEBAR_WIDTH}px` : '28px' }}>
+        {isOpen && <span style={{ fontSize: '11px', color: '#3568FF', letterSpacing: '0.15em', fontWeight: 'bold', textTransform: 'uppercase', paddingLeft: '16px', whiteSpace: 'nowrap' }}>Sessions</span>}
+        <button onClick={onToggle} style={{ background: 'none', border: 'none', color: '#3568FF', cursor: 'pointer', fontSize: '14px', padding: '4px 8px', fontFamily: 'inherit' }}>{isOpen ? '◂' : '▸'}</button>
       </div>
       {isOpen && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px', minWidth: `${SIDEBAR_WIDTH}px` }}>
           {/* Blocks */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '10px', color: '#4a6a6a', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid #0a2020' }}>Blocks</div>
+            <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Blocks</div>
             {BLOCK_TYPES.map(b => <BlockSidebarItem key={b.id} block={b} onDragStart={onDragStart} />)}
           </div>
           {/* Unscheduled */}
           <div style={{ marginBottom: '20px' }}>
-            <div style={{ fontSize: '10px', color: '#4a6a6a', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid #0a2020' }}>Unscheduled ({unscheduled.length})</div>
-            {unscheduled.length === 0 ? <div style={{ fontSize: '11px', color: '#2a4a4a', fontStyle: 'italic', padding: '8px 0' }}>No unscheduled sessions</div>
+            <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Unscheduled ({unscheduled.length})</div>
+            {unscheduled.length === 0 ? <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.2)', fontStyle: 'italic', padding: '8px 0' }}>No unscheduled sessions</div>
               : unscheduled.map(s => <SidebarCard key={s.id} session={s} speakers={speakers} onClick={() => onEdit(s)} onDragStart={onDragStart} />)}
           </div>
           {/* Scheduled */}
           <div>
-            <div style={{ fontSize: '10px', color: '#4a6a6a', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid #0a2020' }}>Scheduled — {DAYS.find(d => d.id === selectedDay)?.label} ({scheduled.length})</div>
-            {scheduled.length === 0 ? <div style={{ fontSize: '11px', color: '#2a4a4a', fontStyle: 'italic', padding: '8px 0' }}>No sessions for this day</div>
+            <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Scheduled — {DAYS.find(d => d.id === selectedDay)?.label} ({scheduled.length})</div>
+            {scheduled.length === 0 ? <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.2)', fontStyle: 'italic', padding: '8px 0' }}>No sessions for this day</div>
               : scheduled.map(s => <SidebarCard key={s.id} session={s} speakers={speakers} onClick={() => onEdit(s)} onDragStart={onDragStart} />)}
           </div>
         </div>
@@ -595,7 +595,7 @@ function SidebarPanel({ sessions, speakers, selectedDay, onEdit, onDragStart, is
 function SessionCard({ session, speakers, onClick, style, onDragStart }) {
   const statusDef = SESSION_STATUSES.find(s => s.id === session.status) || SESSION_STATUSES[0];
   const sessionSpeakers = speakers.filter(sp => getSpeakerIds(session.speakers).includes(sp.id));
-  const topicColor = session.topics?.[0] ? TOPIC_TAG_COLORS[session.topics[0]] : '#0CEBF1';
+  const topicColor = session.topics?.[0] ? TOPIC_TAG_COLORS[session.topics[0]] : '#3568FF';
   const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
   const timeLabel = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(startMins + session.duration_minutes)}` : null;
   const metaColor = statusDef.textColor;
@@ -615,7 +615,7 @@ function SessionCard({ session, speakers, onClick, style, onDragStart }) {
         borderRight: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
         borderBottom: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
         borderLeft: `3px solid ${leftAccent}`,
-        borderRadius: '4px', padding: dur < 20 ? '2px 6px' : '6px 8px', cursor: 'grab',
+        borderRadius: '6px', padding: dur < 20 ? '2px 6px' : '6px 8px', cursor: 'grab',
         overflow: 'hidden', boxSizing: 'border-box', transition: 'opacity 0.15s', zIndex: 10,
         ...style
       }}
@@ -678,16 +678,16 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
           <div key={mins}
             onClick={() => isOpen && openNewSession(stage.id, mins)}
             onDragOver={isOpen ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } : undefined}
-            onDragEnter={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = '#0a1a1a'; } : undefined}
-            onDragLeave={isOpen ? e => { e.currentTarget.style.background = isOpen ? '#050d0d' : '#020808'; } : undefined}
-            onDrop={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = '#050d0d'; handleDrop(stage.id, mins, colIndex); } : undefined}
+            onDragEnter={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = 'rgb(18,18,18)'; } : undefined}
+            onDragLeave={isOpen ? e => { e.currentTarget.style.background = isOpen ? 'rgb(10,10,10)' : 'rgb(5,5,5)'; } : undefined}
+            onDrop={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = 'rgb(10,10,10)'; handleDrop(stage.id, mins, colIndex); } : undefined}
             style={{
               position: 'absolute', left: 0, right: 0,
               top: `${(mins - gridStart) / 5 * SLOT_HEIGHT}px`,
               height: `${SLOT_HEIGHT}px`,
-              background: isErr ? '#3a0a0a' : isClosed ? '#020808' : '#050d0d',
-              borderBottom: mins % 60 === 0 ? '1px solid #0a1a1a' : mins % 30 === 0 ? '1px solid #081212' : 'none',
-              borderRight: isLastCol ? '1px solid #0a2020' : '1px dashed #060e0e',
+              background: isErr ? '#3a0a0a' : isClosed ? 'rgb(5,5,5)' : 'rgb(10,10,10)',
+              borderBottom: mins % 60 === 0 ? '1px solid rgb(18,18,18)' : mins % 30 === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none',
+              borderRight: isLastCol ? '1px solid rgba(255,255,255,0.06)' : '1px dashed rgba(255,255,255,0.03)',
               cursor: isOpen ? 'cell' : 'default',
               outline: isErr ? '1px solid #f87171' : 'none',
             }}
@@ -703,7 +703,7 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
           background: 'repeating-linear-gradient(45deg, #111111 0px, #111111 6px, #0e0e0e 6px, #0e0e0e 12px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           overflow: 'hidden', borderBottom: '1px solid #333333', zIndex: 5,
-          borderRight: isLastCol ? '1px solid #0a2020' : '1px dashed #060e0e',
+          borderRight: isLastCol ? '1px solid rgba(255,255,255,0.06)' : '1px dashed rgba(255,255,255,0.03)',
         }}>
           <span style={{ fontSize: '11px', color: '#444444', letterSpacing: '0.2em', fontWeight: 'bold', textTransform: 'uppercase', writingMode: 'vertical-rl', whiteSpace: 'nowrap' }}>STAGE CLOSED</span>
         </div>
@@ -716,7 +716,7 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
           background: 'repeating-linear-gradient(45deg, #111111 0px, #111111 6px, #0e0e0e 6px, #0e0e0e 12px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           overflow: 'hidden', borderTop: '1px solid #333333', zIndex: 5,
-          borderRight: isLastCol ? '1px solid #0a2020' : '1px dashed #060e0e',
+          borderRight: isLastCol ? '1px solid rgba(255,255,255,0.06)' : '1px dashed rgba(255,255,255,0.03)',
         }}>
           <span style={{ fontSize: '11px', color: '#444444', letterSpacing: '0.2em', fontWeight: 'bold', textTransform: 'uppercase', writingMode: 'vertical-rl', whiteSpace: 'nowrap' }}>STAGE CLOSED</span>
         </div>
@@ -759,13 +759,13 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
   const RT_CARD_WIDTH = 240;
 
   return (
-    <div style={{ borderTop: `2px solid ${stage.color}`, background: '#020a0a', padding: '16px 0' }}>
+    <div style={{ borderTop: `2px solid ${stage.color}`, background: 'rgb(8,8,8)', padding: '16px 0' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '0 24px', marginBottom: '16px' }}>
         <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: stage.color, flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: '13px', fontWeight: 'bold', color: stage.color, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{stage.name}</div>
-          <div style={{ fontSize: '10px', color: '#4a6a6a' }}>4 time blocks · {maxCols} parallel slots each</div>
+          <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)' }}>4 time blocks · {maxCols} parallel slots each</div>
         </div>
       </div>
 
@@ -781,7 +781,7 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
           <div key={blockIdx} style={{ padding: '8px 24px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '8px' }}>
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: stage.color, letterSpacing: '0.08em' }}>{block.label}</span>
-              <span style={{ fontSize: '11px', color: '#2a5a5a', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: '11px', color: 'rgba(240,240,240,0.3)', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
                 {formatTime24(block.start)}–{formatTime24(block.end)} · {blockDuration}m
               </span>
             </div>
@@ -813,8 +813,8 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                       </div>
                     );
                   }
-                  const rtMetaColor = session.status === 'confirmed' ? '#7ae8e8' : '#4a8a8a';
-                  const rtLeftAccent = session.status === 'confirmed' ? '#0CEBF1' : topicColor;
+                  const rtMetaColor = session.status === 'confirmed' ? 'rgba(240,240,240,0.7)' : 'rgba(240,240,240,0.4)';
+                  const rtLeftAccent = session.status === 'confirmed' ? '#3568FF' : topicColor;
                   return (
                     <div key={colIdx} draggable="true"
                       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(session); }}
@@ -846,18 +846,18 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                 return (
                   <div key={colIdx}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                    onDragEnter={e => { e.preventDefault(); e.currentTarget.style.borderColor = stage.color; e.currentTarget.style.background = '#0a1a1a'; }}
-                    onDragLeave={e => { e.currentTarget.style.borderColor = '#1a2a2a'; e.currentTarget.style.background = 'transparent'; }}
-                    onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = '#1a2a2a'; e.currentTarget.style.background = 'transparent'; handleDrop(stage.id, block.start, colIdx); }}
+                    onDragEnter={e => { e.preventDefault(); e.currentTarget.style.borderColor = stage.color; e.currentTarget.style.background = 'rgb(18,18,18)'; }}
+                    onDragLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = 'transparent'; }}
+                    onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = 'transparent'; handleDrop(stage.id, block.start, colIdx); }}
                     onClick={() => openNewSession(stage.id, block.start)}
                     style={{
                       width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '4px',
-                      border: '1px dashed #1a2a2a', cursor: 'cell',
+                      border: '1px dashed rgba(255,255,255,0.06)', cursor: 'cell',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       minHeight: '48px', transition: 'all 0.15s',
                     }}
                   >
-                    <span style={{ fontSize: '10px', color: '#1a3a3a', letterSpacing: '0.05em' }}>Slot {colIdx + 1}</span>
+                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.08)', letterSpacing: '0.05em' }}>Slot {colIdx + 1}</span>
                   </div>
                 );
               })}
@@ -928,39 +928,39 @@ function RegistrationsModal({ isOpen, onClose, sessions, stages }) {
       alignItems: 'center', justifyContent: 'center', padding: '24px',
     }} onClick={onClose}>
       <div style={{
-        background: '#020808', border: '1px solid #0a2a2a', borderRadius: '4px',
+        background: 'rgb(5,5,5)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '4px',
         width: '640px', maxWidth: '100%', maxHeight: '80vh', overflow: 'auto',
         padding: '24px',
       }} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h2 style={{ fontSize: '14px', color: '#0CEBF1', margin: 0, letterSpacing: '0.1em' }}>REGISTRATIONS</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#4a6a6a', cursor: 'pointer', fontSize: '18px' }}>&times;</button>
+          <h2 style={{ fontSize: '14px', color: '#3568FF', margin: 0, letterSpacing: '0.1em' }}>REGISTRATIONS</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '18px' }}>&times;</button>
         </div>
 
         {loadingReg ? (
-          <div style={{ color: '#4a6a6a', textAlign: 'center', padding: '40px 0' }}>Loading...</div>
+          <div style={{ color: 'rgba(240,240,240,0.4)', textAlign: 'center', padding: '40px 0' }}>Loading...</div>
         ) : (
           <>
             {/* Summary stats */}
-            <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', padding: '16px', background: '#0a1212', borderRadius: '4px' }}>
+            <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', padding: '16px', background: 'rgb(13,13,13)', borderRadius: '4px' }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#0CEBF1' }}>{attendees.length}</div>
-                <div style={{ fontSize: '9px', color: '#4a6a6a', letterSpacing: '0.1em', marginTop: '4px' }}>ATTENDEES</div>
+                <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#3568FF' }}>{attendees.length}</div>
+                <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', marginTop: '4px' }}>ATTENDEES</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#22c55e' }}>{rtRegistrations.length}</div>
-                <div style={{ fontSize: '9px', color: '#4a6a6a', letterSpacing: '0.1em', marginTop: '4px' }}>RT SIGNUPS</div>
+                <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', marginTop: '4px' }}>RT SIGNUPS</div>
               </div>
               <div style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#FFFBC9' }}>{questSaves.length}</div>
-                <div style={{ fontSize: '9px', color: '#4a6a6a', letterSpacing: '0.1em', marginTop: '4px' }}>QUEST SAVES</div>
+                <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', marginTop: '4px' }}>QUEST SAVES</div>
               </div>
             </div>
 
             {/* Roundtable sessions with registration counts */}
-            <h3 style={{ fontSize: '11px', color: '#e0f0f0', margin: '0 0 12px', letterSpacing: '0.1em' }}>ROUNDTABLE REGISTRATIONS</h3>
+            <h3 style={{ fontSize: '11px', color: 'rgb(240,240,240)', margin: '0 0 12px', letterSpacing: '0.1em' }}>ROUNDTABLE REGISTRATIONS</h3>
             {roundtableSessions.length === 0 ? (
-              <div style={{ color: '#4a6a6a', fontSize: '12px', marginBottom: '24px' }}>No roundtable sessions found.</div>
+              <div style={{ color: 'rgba(240,240,240,0.4)', fontSize: '12px', marginBottom: '24px' }}>No roundtable sessions found.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
                 {roundtableSessions.map(s => {
@@ -974,31 +974,31 @@ function RegistrationsModal({ isOpen, onClose, sessions, stages }) {
                         onClick={() => expandRoundtable(s.id)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: '12px',
-                          padding: '10px 12px', background: '#0a1212',
+                          padding: '10px 12px', background: 'rgb(13,13,13)',
                           borderRadius: '4px', cursor: 'pointer',
-                          border: isExpanded ? '1px solid #0CEBF1' : '1px solid transparent',
+                          border: isExpanded ? '1px solid #3568FF' : '1px solid transparent',
                           transition: 'border-color 0.15s',
                         }}
                       >
-                        <span style={{ flex: 1, fontSize: '12px', color: '#e0f0f0' }}>{s.title}</span>
+                        <span style={{ flex: 1, fontSize: '12px', color: 'rgb(240,240,240)' }}>{s.title}</span>
                         <span style={{ fontSize: '11px', color: count >= (cap || Infinity) ? '#f87171' : '#22c55e', fontWeight: 'bold' }}>
                           {count}{cap ? `/${cap}` : ''}
                         </span>
                         {cap && (
-                          <div style={{ width: '60px', height: '4px', background: '#1a2a2a', borderRadius: '2px', overflow: 'hidden' }}>
+                          <div style={{ width: '60px', height: '4px', background: 'rgba(255,255,255,0.06)', borderRadius: '2px', overflow: 'hidden' }}>
                             <div style={{ width: `${pct}%`, height: '100%', background: pct >= 100 ? '#f87171' : '#22c55e' }} />
                           </div>
                         )}
-                        <span style={{ fontSize: '10px', color: '#4a6a6a' }}>{isExpanded ? '\u25B2' : '\u25BC'}</span>
+                        <span style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)' }}>{isExpanded ? '\u25B2' : '\u25BC'}</span>
                       </div>
                       {isExpanded && (
-                        <div style={{ padding: '8px 12px 8px 24px', background: '#060e0e', borderRadius: '0 0 4px 4px' }}>
+                        <div style={{ padding: '8px 12px 8px 24px', background: 'rgba(255,255,255,0.03)', borderRadius: '0 0 4px 4px' }}>
                           {expandedAttendees.length === 0 ? (
-                            <div style={{ fontSize: '11px', color: '#4a6a6a' }}>No registrations yet.</div>
+                            <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)' }}>No registrations yet.</div>
                           ) : (
                             <table style={{ width: '100%', fontSize: '11px', borderCollapse: 'collapse' }}>
                               <thead>
-                                <tr style={{ color: '#4a6a6a' }}>
+                                <tr style={{ color: 'rgba(240,240,240,0.4)' }}>
                                   <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 'normal', letterSpacing: '0.05em' }}>NAME</th>
                                   <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 'normal', letterSpacing: '0.05em' }}>EMAIL</th>
                                   <th style={{ textAlign: 'left', padding: '4px 8px', fontWeight: 'normal', letterSpacing: '0.05em' }}>COMPANY</th>
@@ -1009,9 +1009,9 @@ function RegistrationsModal({ isOpen, onClose, sessions, stages }) {
                                 {expandedAttendees.map(a => (
                                   <tr key={a.id}>
                                     <td style={{ padding: '4px 8px', color: '#FFFBC9' }}>{a.name}</td>
-                                    <td style={{ padding: '4px 8px', color: '#e0f0f0' }}>{a.email}</td>
-                                    <td style={{ padding: '4px 8px', color: '#4a6a6a' }}>{a.company || '—'}</td>
-                                    <td style={{ padding: '4px 8px', color: '#4a6a6a' }}>
+                                    <td style={{ padding: '4px 8px', color: 'rgb(240,240,240)' }}>{a.email}</td>
+                                    <td style={{ padding: '4px 8px', color: 'rgba(240,240,240,0.4)' }}>{a.company || '—'}</td>
+                                    <td style={{ padding: '4px 8px', color: 'rgba(240,240,240,0.4)' }}>
                                       {a.registered_at ? new Date(a.registered_at).toLocaleDateString() : '—'}
                                     </td>
                                   </tr>
@@ -1028,23 +1028,23 @@ function RegistrationsModal({ isOpen, onClose, sessions, stages }) {
             )}
 
             {/* Recent attendees list */}
-            <h3 style={{ fontSize: '11px', color: '#e0f0f0', margin: '0 0 12px', letterSpacing: '0.1em' }}>RECENT ATTENDEES</h3>
+            <h3 style={{ fontSize: '11px', color: 'rgb(240,240,240)', margin: '0 0 12px', letterSpacing: '0.1em' }}>RECENT ATTENDEES</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               {attendees.slice(0, 50).map(a => (
                 <div key={a.id} style={{
                   display: 'flex', gap: '12px', padding: '6px 12px',
-                  fontSize: '11px', background: '#0a1212', borderRadius: '2px',
+                  fontSize: '11px', background: 'rgb(13,13,13)', borderRadius: '2px',
                 }}>
                   <span style={{ color: '#FFFBC9', minWidth: '120px' }}>{a.name}</span>
-                  <span style={{ color: '#e0f0f0', flex: 1 }}>{a.email}</span>
-                  <span style={{ color: '#4a6a6a' }}>{a.company || ''}</span>
-                  <span style={{ color: '#2a4a4a', fontSize: '10px' }}>
+                  <span style={{ color: 'rgb(240,240,240)', flex: 1 }}>{a.email}</span>
+                  <span style={{ color: 'rgba(240,240,240,0.4)' }}>{a.company || ''}</span>
+                  <span style={{ color: 'rgba(240,240,240,0.2)', fontSize: '10px' }}>
                     {new Date(a.created_at).toLocaleDateString()}
                   </span>
                 </div>
               ))}
               {attendees.length > 50 && (
-                <div style={{ fontSize: '10px', color: '#4a6a6a', padding: '8px 12px' }}>
+                <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)', padding: '8px 12px' }}>
                   + {attendees.length - 50} more attendees
                 </div>
               )}
@@ -1097,7 +1097,8 @@ export default function NerdConPlanner() {
       const payload = {
         title: session.title, status: session.status, format: session.format,
         duration_minutes: session.duration_minutes, speakers: session.speakers,
-        topics: session.topics, notes: session.notes, stage_id: session.stage_id,
+        topics: session.topics, notes: session.notes, description: session.description,
+        stage_id: session.stage_id,
         day: session.day, start_time: session.start_time, end_time: session.end_time,
         column_index: session.column_index || 0,
         type: session.type || null, block_type: session.block_type || null,
@@ -1203,40 +1204,40 @@ export default function NerdConPlanner() {
   const onEditSession = (s) => { setEditingSession(s); setShowModal(true); };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#020808', color: '#e0f0f0', fontFamily: "'Space Mono', monospace", overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'rgb(5,5,5)', color: 'rgb(240,240,240)', fontFamily: "'JetBrains Mono', ui-monospace, monospace", overflow: 'hidden' }}>
       {/* Top Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: '52px', borderBottom: '1px solid #0a2020', background: '#020f0f', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: '52px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgb(8,8,8)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-          <span style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.15em', color: '#0CEBF1' }}>FINTECH</span>
+          <span style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.15em', color: '#3568FF' }}>FINTECH</span>
           <span style={{ fontSize: '14px', fontWeight: 'bold', letterSpacing: '0.15em', color: '#ffffff' }}>NERDCON</span>
-          <span style={{ fontSize: '10px', color: '#2a4a4a', letterSpacing: '0.1em' }}>SAN DIEGO · NOV 18–20 · OPS</span>
+          <span style={{ fontSize: '10px', color: 'rgba(240,240,240,0.3)', letterSpacing: '0.1em' }}>SAN DIEGO · NOV 18–20 · OPS</span>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
           {DAYS.map(day => (
             <button key={day.id} onClick={() => setSelectedDay(day.id)} style={{
-              padding: '6px 20px', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', letterSpacing: '0.05em',
-              background: selectedDay === day.id ? '#0CEBF1' : 'transparent',
-              border: `1px solid ${selectedDay === day.id ? '#0CEBF1' : '#0a2a2a'}`,
-              color: selectedDay === day.id ? '#001a1a' : '#4a6a6a',
+              padding: '6px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', letterSpacing: '0.05em',
+              background: selectedDay === day.id ? '#3568FF' : 'transparent',
+              border: `1px solid ${selectedDay === day.id ? '#3568FF' : 'rgba(255,255,255,0.06)'}`,
+              color: selectedDay === day.id ? '#fff' : 'rgba(240,240,240,0.4)',
               fontWeight: selectedDay === day.id ? 'bold' : 'normal', transition: 'all 0.15s'
             }}>{day.label} · {day.date}</button>
           ))}
         </div>
         <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
           {[
-            { label: 'CONFIRMED', value: confirmedCount, color: '#0CEBF1' },
-            { label: 'SCHEDULED', value: totalScheduled, color: '#e0f0f0' },
-            { label: 'CLASHES', value: clashes, color: clashes > 0 ? '#f87171' : '#2a4a4a' },
+            { label: 'CONFIRMED', value: confirmedCount, color: '#3568FF' },
+            { label: 'SCHEDULED', value: totalScheduled, color: 'rgb(240,240,240)' },
+            { label: 'CLASHES', value: clashes, color: clashes > 0 ? '#f87171' : 'rgba(240,240,240,0.2)' },
           ].map(stat => (
             <div key={stat.label} style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '18px', fontWeight: 'bold', color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-              <div style={{ fontSize: '9px', color: '#2a4a4a', letterSpacing: '0.1em', marginTop: '2px' }}>{stat.label}</div>
+              <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.2)', letterSpacing: '0.1em', marginTop: '2px' }}>{stat.label}</div>
             </div>
           ))}
-          <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#0CEBF1', border: 'none', borderRadius: '4px', padding: '0 16px', color: '#001a1a', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold', letterSpacing: '0.05em', height: '32px' }}>+ NEW</button>
-          <button onClick={() => setShowRegistrations(true)} style={{ background: 'none', border: '1px solid #0a2a2a', borderRadius: '4px', padding: '0 12px', color: '#4a6a6a', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Registrations">{'\u{1F465}'}</button>
-          <button onClick={() => setShowStagesModal(true)} style={{ background: 'none', border: '1px solid #0a2a2a', borderRadius: '4px', padding: '0 12px', color: '#4a6a6a', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Manage Stages">{'⚙'}</button>
-          <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'none', border: '1px solid #0a2a2a', borderRadius: '4px', padding: '0 16px', color: '#4a6a6a', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', letterSpacing: '0.05em', textDecoration: 'none', display: 'flex', alignItems: 'center', height: '32px' }}>VIEW &#8599;</a>
+          <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#3568FF', border: 'none', borderRadius: '8px', padding: '0 16px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold', letterSpacing: '0.05em', height: '32px' }}>+ NEW</button>
+          <button onClick={() => setShowRegistrations(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Registrations">{'\u{1F465}'}</button>
+          <button onClick={() => setShowStagesModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Manage Stages">{'⚙'}</button>
+          <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 16px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', letterSpacing: '0.05em', textDecoration: 'none', display: 'flex', alignItems: 'center', height: '32px' }}>VIEW &#8599;</a>
         </div>
       </div>
 
@@ -1246,36 +1247,36 @@ export default function NerdConPlanner() {
           onEdit={onEditSession} onDragStart={onDragStart} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(p => !p)} />
 
         {loading ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0CEBF1' }}>Loading...</div>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3568FF' }}>Loading...</div>
         ) : (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: '100%' }}>
 
               {/* ── Sticky header row (hall names + stage names) ── */}
-              <div style={{ position: 'sticky', top: 0, zIndex: 30, display: 'flex', background: '#020f0f' }}>
+              <div style={{ position: 'sticky', top: 0, zIndex: 30, display: 'flex', background: 'rgb(8,8,8)' }}>
                 {/* Corner cell — sticky in both directions */}
-                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 31, background: '#020f0f' }}>
-                  <div style={{ height: '52px', borderBottom: '1px solid #0a2020', borderRight: '1px solid #0a2020' }} />
-                  <div style={{ height: '44px', borderBottom: '1px solid #0a2020', borderRight: '1px solid #0a2020' }} />
+                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 31, background: 'rgb(8,8,8)' }}>
+                  <div style={{ height: '52px', borderBottom: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)' }} />
+                  <div style={{ height: '44px', borderBottom: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)' }} />
                 </div>
                 {halls.map(hall => {
                   const hallWidth = hall.stages.reduce((sum, s) => sum + STAGE_COL_WIDTH * (s.max_columns || 1), 0);
                   return (
                     <div key={hall.id} style={{ flexShrink: 0 }}>
                       <div style={{
-                        height: '52px', background: '#020f0f', borderBottom: '1px solid #0CEBF1', borderRight: '1px solid #0a2020',
+                        height: '52px', background: 'rgb(8,8,8)', borderBottom: '1px solid #3568FF', borderRight: '1px solid rgba(255,255,255,0.06)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: `${hallWidth}px`, borderTop: '2px solid #0CEBF1',
+                        width: `${hallWidth}px`, borderTop: '2px solid #3568FF',
                       }}>
-                        <span style={{ fontSize: '11px', color: '#0CEBF1', letterSpacing: '0.15em', fontWeight: 'bold' }}>{hall.name.toUpperCase()}</span>
+                        <span style={{ fontSize: '11px', color: '#3568FF', letterSpacing: '0.15em', fontWeight: 'bold' }}>{hall.name.toUpperCase()}</span>
                       </div>
                       <div style={{ display: 'flex' }}>
                         {hall.stages.map(stage => {
                           const maxCols = stage.max_columns || 1;
                           return (
-                            <div key={stage.id} style={{ width: `${STAGE_COL_WIDTH * maxCols}px`, height: '44px', padding: '0 8px', borderBottom: `2px solid ${stage.color}`, borderRight: '1px solid #0a2020', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: '#020f0f', boxSizing: 'border-box' }}>
+                            <div key={stage.id} style={{ width: `${STAGE_COL_WIDTH * maxCols}px`, height: '44px', padding: '0 8px', borderBottom: `2px solid ${stage.color}`, borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgb(8,8,8)', boxSizing: 'border-box' }}>
                               <div style={{ fontSize: '11px', color: stage.color, fontWeight: 'bold', letterSpacing: '0.05em' }}>{stage.name}</div>
-                              <div style={{ fontSize: '9px', color: '#2a4a4a' }}>{stage.open_from}–{stage.open_until}{maxCols > 1 ? ` · ${maxCols}col` : ''}</div>
+                              <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.2)' }}>{stage.open_from}–{stage.open_until}{maxCols > 1 ? ` · ${maxCols}col` : ''}</div>
                             </div>
                           );
                         })}
@@ -1288,10 +1289,10 @@ export default function NerdConPlanner() {
               {/* ── Body (time column + slot columns) ── */}
               <div style={{ display: 'flex' }}>
                 {/* Time column — sticky left */}
-                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 15, background: '#020808' }}>
+                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 15, background: 'rgb(5,5,5)' }}>
                   {TIME_SLOTS.map(mins => (
-                    <div key={mins} style={{ height: `${SLOT_HEIGHT}px`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', borderRight: '1px solid #0a2020', borderBottom: mins % 60 === 0 ? '1px solid #0a1a1a' : mins % 30 === 0 ? '1px solid #081212' : 'none' }}>
-                      {mins % 30 === 0 && <span style={{ fontSize: '10px', color: mins % 60 === 0 ? '#2a5a5a' : '#1a3a3a', fontFamily: 'monospace' }}>{formatTime(mins)}</span>}
+                    <div key={mins} style={{ height: `${SLOT_HEIGHT}px`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.06)', borderBottom: mins % 60 === 0 ? '1px solid rgb(18,18,18)' : mins % 30 === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
+                      {mins % 30 === 0 && <span style={{ fontSize: '10px', color: mins % 60 === 0 ? 'rgba(240,240,240,0.3)' : 'rgba(255,255,255,0.08)', fontFamily: 'monospace' }}>{formatTime(mins)}</span>}
                     </div>
                   ))}
                 </div>
