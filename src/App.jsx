@@ -625,10 +625,7 @@ function SessionCard({ session, speakers, onClick, style, onDragStart }) {
       {timeLabel && <div style={{ fontSize: '11px', letterSpacing: '0.03em', color: metaColor, lineHeight: 1, marginBottom: dur < 20 ? '1px' : '3px', fontWeight: 500 }}>{timeLabel}</div>}
       <div style={{ fontSize: dur < 20 ? '11px' : '13px', fontWeight: 'bold', letterSpacing: '0.04em', color: statusDef.textColor, textTransform: 'uppercase', lineHeight: 1.2, marginBottom: showFormat ? '4px' : 0, whiteSpace: dur < 20 ? 'nowrap' : undefined, overflow: dur < 20 ? 'hidden' : undefined, textOverflow: dur < 20 ? 'ellipsis' : undefined }}>{session.title}</div>
       {showFormat && session.format && <div style={{ marginBottom: '3px' }}><span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '2px', background: leftAccent + '18', color: metaColor, letterSpacing: '0.04em' }}>{session.format}</span></div>}
-      {showSpeakers && sessionSpeakers.length > 0 && <div style={{ fontSize: '12px', color: metaColor, lineHeight: 1.3 }}>{sessionSpeakers.map(s => {
-        const role = getSpeakerRole(session.speakers, s.id);
-        return role === 'moderator' ? `[MOD] ${s.name}` : s.name;
-      }).join(', ')}</div>}
+      {sessionSpeakers.length > 0 && <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', lineHeight: 1.3, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sessionSpeakers.slice(0, 3).map(s => s.name).join(', ')}{sessionSpeakers.length > 3 ? ` +${sessionSpeakers.length - 3}` : ''}</div>}
       {showTopics && session.topics?.[0] && <div style={{ fontSize: '10px', color: topicColor, marginTop: '3px', opacity: 0.8 }}>{session.topics[0]}{session.topics[1] ? `, ${session.topics[1]}` : ''}</div>}
     </div>
   );
