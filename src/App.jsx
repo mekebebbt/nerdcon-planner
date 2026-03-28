@@ -94,6 +94,9 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [description, setDescription] = useState('');
   const [stageId, setStageId] = useState('');
   const [capacity, setCapacity] = useState('');
+  const [venue, setVenue] = useState('');
+  const [host, setHost] = useState('');
+  const [inviteOnly, setInviteOnly] = useState(false);
   const [newSpkName, setNewSpkName] = useState('');
   const [newSpkTitle, setNewSpkTitle] = useState('');
   const [newSpkCompany, setNewSpkCompany] = useState('');
@@ -132,16 +135,21 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setDescription(editingSession.description || '');
       setStageId(editingSession.stage_id || (stages[0]?.id || ''));
       setCapacity(editingSession.capacity ?? '');
+      setVenue(editingSession.venue || '');
+      setHost(editingSession.host || '');
+      setInviteOnly(editingSession.invite_only || false);
       if (editingSession.start_time) setStartTime(formatTime24(isoToMinutes(editingSession.start_time)));
     } else {
       setTitle(''); setStatus('placeholder'); setFormat('Panel');
       setDuration(30); setStartTime('09:00'); setSelectedSpeakers([]);
       setTopics([]); setNotes(''); setDescription(''); setStageId(stages[0]?.id || '');
-      setCapacity('');
+      setCapacity(''); setVenue(''); setHost(''); setInviteOnly(false);
     }
   }, [editingSession, isOpen, stages]);
 
   if (!isOpen) return null;
+
+  const isDay0 = selectedDay === 'day0';
 
   const handleSave = () => {
     const [h, m] = startTime.split(':').map(Number);
@@ -149,11 +157,15 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
     const session = {
       ...(editingSession || {}),
       id: editingSession?.id || null,
-      title: title || `${format} Session`,
-      status: isBlock ? 'block' : status, format, duration_minutes: duration,
-      speakers: selectedSpeakers, topics, notes, description,
-      stage_id: stageId, day: selectedDay,
+      title: title || (isDay0 ? 'Activation' : `${format} Session`),
+      status: isBlock ? 'block' : status, format: isDay0 ? null : format, duration_minutes: duration,
+      speakers: isDay0 ? [] : selectedSpeakers, topics: isDay0 ? [] : topics, notes, description,
+      stage_id: isDay0 ? null : stageId, day: selectedDay,
       capacity: capacity === '' ? null : Number(capacity),
+      venue: isDay0 ? (venue || null) : (editingSession?.venue || null),
+      host: isDay0 ? (host || null) : (editingSession?.host || null),
+      invite_only: isDay0 ? inviteOnly : (editingSession?.invite_only || false),
+      type: isDay0 ? 'event' : (editingSession?.type || null),
       start_time: minutesToIso(DAYS.find(d => d.id === selectedDay)?.full, startMins),
       end_time: minutesToIso(DAYS.find(d => d.id === selectedDay)?.full, startMins + duration),
     };
@@ -162,14 +174,14 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   };
 
   return (
-    <ModalShell onClose={onClose} title={editingSession ? (isBlock ? 'Edit Block' : 'Edit Session') : 'New Session'}>
+    <ModalShell onClose={onClose} title={editingSession ? (isBlock ? 'Edit Block' : isDay0 ? 'Edit Activation' : 'Edit Session') : (isDay0 ? 'New Activation' : 'New Session')}>
       <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div>
           <label style={labelStyle}>Title</label>
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Leave blank for auto title" style={inputStyle} />
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder={isDay0 ? "Activation name" : "Leave blank for auto title"} style={inputStyle} />
         </div>
 
-        {!isBlock && (
+        {!isBlock && !isDay0 && (
           <div>
             <label style={labelStyle}>Status</label>
             <div style={{ display: 'flex', gap: '8px' }}>
@@ -186,7 +198,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          {!isBlock && (
+          {!isBlock && !isDay0 && (
             <div>
               <label style={labelStyle}>Format</label>
               <select value={format} onChange={e => setFormat(e.target.value)} style={inputStyle}>
@@ -195,10 +207,14 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
             </div>
           )}
           <div>
+            <label style={labelStyle}>Start Time</label>
+            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inputStyle} />
+          </div>
+          <div>
             <label style={labelStyle}>Duration (min)</label>
             <input type="number" value={duration} min={0} step={5} onChange={e => setDuration(Number(e.target.value))} style={inputStyle} />
           </div>
-          {!isBlock && (
+          {!isBlock && !isDay0 && (
             <div>
               <label style={labelStyle}>Capacity</label>
               <input type="number" value={capacity} min={0} placeholder="—" onChange={e => setCapacity(e.target.value === '' ? '' : Number(e.target.value))} style={inputStyle} />
@@ -206,20 +222,37 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
           )}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <div>
-            <label style={labelStyle}>Stage</label>
-            <select value={stageId} onChange={e => setStageId(e.target.value)} style={inputStyle}>
-              {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>Start Time</label>
-            <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} style={inputStyle} />
-          </div>
-        </div>
+        {isDay0 && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div>
+                <label style={labelStyle}>Venue</label>
+                <input value={venue} onChange={e => setVenue(e.target.value)} placeholder="e.g. Rooftop Bar, Pool Deck" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Host</label>
+                <input value={host} onChange={e => setHost(e.target.value)} placeholder="e.g. Company name" style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input type="checkbox" checked={inviteOnly} onChange={e => setInviteOnly(e.target.checked)} style={{ accentColor: '#f59e0b', width: '16px', height: '16px' }} />
+              <label style={{ ...labelStyle, marginBottom: 0 }}>Invite Only</label>
+            </div>
+          </>
+        )}
 
-        {!isBlock && (
+        {!isDay0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div>
+              <label style={labelStyle}>Stage</label>
+              <select value={stageId} onChange={e => setStageId(e.target.value)} style={inputStyle}>
+                {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {!isBlock && !isDay0 && (
           <>
             <div>
               <label style={labelStyle}>Topics</label>
@@ -311,7 +344,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
         )}
 
         <div>
-          <label style={labelStyle}>Notes</label>
+          <label style={labelStyle}>Notes (internal)</label>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Internal notes (not shown to attendees)..." style={{ ...inputStyle, resize: 'vertical' }} />
         </div>
       </div>
@@ -1053,6 +1086,132 @@ function RegistrationsModal({ isOpen, onClose, sessions, stages }) {
   );
 }
 
+// ── Day 0 Activations List ────────────────────────────────────────────────────
+function ActivationsList({ sessions, selectedDay, onEdit, onNew }) {
+  const activations = sessions
+    .filter(s => s.day === selectedDay && s.type === 'event')
+    .sort((a, b) => {
+      if (!a.start_time) return 1;
+      if (!b.start_time) return -1;
+      return isoToMinutes(a.start_time) - isoToMinutes(b.start_time);
+    });
+
+  return (
+    <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+      <div style={{ maxWidth: '720px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+          <div style={{ fontSize: '12px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+            Activations · Day 0 ({activations.length})
+          </div>
+          <button onClick={onNew} style={{
+            background: '#3568FF', border: 'none', borderRadius: '8px',
+            padding: '8px 20px', color: '#fff', cursor: 'pointer',
+            fontSize: '12px', fontFamily: "'JetBrains Mono', ui-monospace, monospace",
+            fontWeight: 'bold', letterSpacing: '0.05em',
+          }}>+ Add Activation</button>
+        </div>
+
+        {activations.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'rgba(240,240,240,0.2)', fontSize: '13px' }}>
+            No activations yet. Add your first Day 0 event.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {activations.map(s => {
+              const startMins = s.start_time ? isoToMinutes(s.start_time) : null;
+              const endMins = startMins !== null ? startMins + s.duration_minutes : null;
+              const timeLabel = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(endMins)}` : '—';
+              return (
+                <div key={s.id} onClick={() => onEdit(s)} style={{
+                  background: 'rgb(13,13,13)', border: '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: '8px', padding: '14px 18px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '16px',
+                  transition: 'border-color 0.15s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = '#3568FF'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+                >
+                  <div style={{ fontSize: '13px', color: '#3568FF', fontFamily: 'monospace', letterSpacing: '0.03em', minWidth: '110px', flexShrink: 0 }}>
+                    {timeLabel}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: '14px', fontWeight: 'bold', color: 'rgb(240,240,240)', letterSpacing: '0.03em', marginBottom: '3px' }}>{s.title}</div>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'rgba(240,240,240,0.4)' }}>
+                      {s.venue && <span>{'\uD83D\uDCCD'} {s.venue}</span>}
+                      {s.host && <span>Hosted by {s.host}</span>}
+                    </div>
+                  </div>
+                  {s.invite_only && (
+                    <span style={{
+                      fontSize: '10px', padding: '3px 10px', borderRadius: '20px',
+                      background: '#f59e0b22', border: '1px solid #f59e0b44',
+                      color: '#f59e0b', letterSpacing: '0.05em', fontWeight: 600, flexShrink: 0,
+                    }}>INVITE ONLY</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Evening Events Section ────────────────────────────────────────────────────
+function EveningEventsSection({ sessions, selectedDay, onEdit }) {
+  const eveningEvents = sessions.filter(s => s.day === selectedDay && s.type === 'event');
+  if (eveningEvents.length === 0) return null;
+
+  eveningEvents.sort((a, b) => {
+    if (!a.start_time) return 1;
+    if (!b.start_time) return -1;
+    return isoToMinutes(a.start_time) - isoToMinutes(b.start_time);
+  });
+
+  return (
+    <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '20px 24px' }}>
+      <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '14px' }}>
+        Evening Events
+      </div>
+      <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
+        {eveningEvents.map(s => {
+          const startMins = s.start_time ? isoToMinutes(s.start_time) : null;
+          const endMins = startMins !== null ? startMins + s.duration_minutes : null;
+          const timeLabel = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(endMins)}` : '';
+          return (
+            <div key={s.id} onClick={() => onEdit(s)} style={{
+              background: 'rgb(13,13,13)', border: '1px solid rgba(255,255,255,0.06)',
+              borderRadius: '8px', padding: '14px 18px', cursor: 'pointer',
+              minWidth: '240px', maxWidth: '300px', flexShrink: 0,
+              transition: 'border-color 0.15s',
+            }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#3568FF'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+            >
+              {timeLabel && <div style={{ fontSize: '11px', color: '#3568FF', fontFamily: 'monospace', marginBottom: '6px' }}>{timeLabel}</div>}
+              <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'rgb(240,240,240)', marginBottom: '4px' }}>{s.title}</div>
+              <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)' }}>
+                {s.venue && <span>{'\uD83D\uDCCD'} {s.venue}</span>}
+                {s.venue && s.host && <span> · </span>}
+                {s.host && <span>{s.host}</span>}
+              </div>
+              {s.invite_only && (
+                <span style={{
+                  display: 'inline-block', marginTop: '6px',
+                  fontSize: '9px', padding: '2px 8px', borderRadius: '20px',
+                  background: '#f59e0b22', border: '1px solid #f59e0b44',
+                  color: '#f59e0b', letterSpacing: '0.05em', fontWeight: 600,
+                }}>INVITE ONLY</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
 export default function NerdConPlanner() {
   const [sessions, setSessions] = useState([]);
@@ -1099,6 +1258,8 @@ export default function NerdConPlanner() {
         day: session.day, start_time: session.start_time, end_time: session.end_time,
         column_index: session.column_index || 0,
         type: session.type || null, block_type: session.block_type || null,
+        venue: session.venue || null, host: session.host || null,
+        invite_only: session.invite_only || false,
       };
       if (session.capacity !== null && session.capacity !== undefined) payload.capacity = session.capacity;
       payload.id = session.id || crypto.randomUUID();
@@ -1240,11 +1401,15 @@ export default function NerdConPlanner() {
 
       {/* Content: Sidebar + Grid */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <SidebarPanel sessions={sessions} speakers={speakers} selectedDay={selectedDay}
-          onEdit={onEditSession} onDragStart={onDragStart} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(p => !p)} />
+        {selectedDay !== 'day0' && (
+          <SidebarPanel sessions={sessions} speakers={speakers} selectedDay={selectedDay}
+            onEdit={onEditSession} onDragStart={onDragStart} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(p => !p)} />
+        )}
 
         {loading ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3568FF' }}>Loading...</div>
+        ) : selectedDay === 'day0' ? (
+          <ActivationsList sessions={sessions} selectedDay="day0" onEdit={onEditSession} onNew={() => { setEditingSession(null); setShowModal(true); }} />
         ) : (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: '100%' }}>
@@ -1352,6 +1517,9 @@ export default function NerdConPlanner() {
                 openNewSession={openNewSession}
               />
             ))}
+
+            {/* ── Evening Events (Days 1 & 2) ── */}
+            <EveningEventsSection sessions={sessions} selectedDay={selectedDay} onEdit={onEditSession} />
           </div>
         )}
       </div>

@@ -48,7 +48,7 @@ const FONTS = {
 };
 
 const isViewableSession = (s) =>
-  s.status === 'confirmed' && s.type !== 'block' && !s.block_type;
+  (s.status === 'confirmed' || s.type === 'event') && s.type !== 'block' && !s.block_type;
 
 // ── Speaker Avatar ─────────────────────────────────────────────────────────────
 function SpeakerAvatar({ name, size = 26 }) {
@@ -553,6 +553,130 @@ function MissionCard({ session, speakerMap, stageMap, bookmarks, onToggleBookmar
   );
 }
 
+// ── Activation Card (Day 0) ────────────────────────────────────────────────────
+function ActivationCard({ session, bookmarks, onToggleBookmark, onClick }) {
+  const isBookmarked = bookmarks.includes(session.id);
+  const [flashState, setFlashState] = useState(null);
+  const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
+  const endMins = startMins !== null ? startMins + session.duration_minutes : null;
+  const timeLabel = startMins !== null ? `${formatTime(startMins)} – ${formatTime(endMins)}` : null;
+
+  return (
+    <div onClick={onClick} style={{
+      background: COLORS.bgCard, border: `1px solid ${COLORS.border}`,
+      borderRadius: '12px', padding: '16px',
+      display: 'flex', flexDirection: 'column', gap: '10px',
+      cursor: 'pointer', position: 'relative',
+      transition: 'border-color 0.15s, transform 0.15s, box-shadow 0.15s',
+    }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = COLORS.primary; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = COLORS.glow; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = COLORS.border; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          {timeLabel && (
+            <span style={{ fontFamily: FONTS.mono, fontSize: '12px', color: COLORS.primary }}>{timeLabel}</span>
+          )}
+          {session.invite_only && (
+            <span style={{
+              fontFamily: FONTS.mono, fontSize: '10px', fontWeight: 600,
+              padding: '3px 10px', borderRadius: '20px',
+              background: '#f59e0b22', border: '1px solid #f59e0b44', color: '#f59e0b',
+              letterSpacing: '0.04em',
+            }}>INVITE ONLY</span>
+          )}
+        </div>
+        <button onClick={(e) => {
+          e.stopPropagation();
+          if (!isBookmarked) { setFlashState('added'); setTimeout(() => setFlashState(null), 700); }
+          onToggleBookmark(session.id);
+        }} title={isBookmarked ? 'Remove from quest' : 'Add to quest'} style={{
+          width: '30px', height: '30px', borderRadius: '8px', flexShrink: 0,
+          background: flashState === 'added' ? 'rgba(34,197,94,0.15)' : isBookmarked ? COLORS.primaryDim : 'rgba(255,255,255,0.05)',
+          border: `1px solid ${flashState === 'added' ? '#22c55e' : isBookmarked ? COLORS.primary : 'rgba(255,255,255,0.1)'}`,
+          color: flashState === 'added' ? '#22c55e' : isBookmarked ? COLORS.primary : COLORS.textMuted,
+          cursor: 'pointer', fontSize: '15px', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s', lineHeight: 1,
+        }}>
+          {flashState === 'added' ? '\u2713' : isBookmarked ? '\u2605' : '+'}
+        </button>
+      </div>
+
+      <h3 style={{ fontFamily: FONTS.mono, fontSize: '15px', fontWeight: 600, color: COLORS.textPrimary, margin: 0, lineHeight: 1.4 }}>
+        {session.title}
+      </h3>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', fontSize: '13px' }}>
+        {session.venue && (
+          <span style={{ fontFamily: FONTS.sans, color: COLORS.textMuted }}>{'\uD83D\uDCCD'} {session.venue}</span>
+        )}
+        {session.host && (
+          <span style={{ fontFamily: FONTS.sans, color: COLORS.textMuted }}>Hosted by {session.host}</span>
+        )}
+      </div>
+
+      {session.description && (
+        <div style={{ fontFamily: FONTS.sans, fontSize: '13px', color: COLORS.textMuted, lineHeight: 1.6, marginTop: '2px' }}>
+          {session.description.length > 120 ? session.description.slice(0, 120) + '...' : session.description}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Evening Events Section (View) ─────────────────────────────────────────────
+function ViewEveningEvents({ sessions, selectedDay, bookmarks, onToggleBookmark, onClick }) {
+  const eveningEvents = sessions.filter(s => s.day === selectedDay && s.type === 'event');
+  if (eveningEvents.length === 0) return null;
+
+  eveningEvents.sort((a, b) => {
+    if (!a.start_time) return 1;
+    if (!b.start_time) return -1;
+    return isoToMinutes(a.start_time) - isoToMinutes(b.start_time);
+  });
+
+  return (
+    <div style={{ marginTop: '32px', paddingTop: '24px', borderTop: `1px solid ${COLORS.border}` }}>
+      <div style={{ fontFamily: FONTS.mono, fontSize: '12px', color: COLORS.textMuted, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>
+        Evening Events
+      </div>
+      <div style={{ display: 'flex', gap: '14px', overflowX: 'auto', paddingBottom: '8px' }}>
+        {eveningEvents.map(s => {
+          const startMins = s.start_time ? isoToMinutes(s.start_time) : null;
+          const endMins = startMins !== null ? startMins + s.duration_minutes : null;
+          const timeLabel = startMins !== null ? `${formatTime(startMins)} – ${formatTime(endMins)}` : null;
+          const isBookmarked = bookmarks.includes(s.id);
+          return (
+            <div key={s.id} onClick={() => onClick(s)} style={{
+              background: COLORS.bgCard, border: `1px solid ${COLORS.border}`,
+              borderRadius: '12px', padding: '16px', minWidth: '260px', maxWidth: '320px', flexShrink: 0,
+              cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = COLORS.primary; e.currentTarget.style.boxShadow = COLORS.glow; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = COLORS.border; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              {timeLabel && <div style={{ fontFamily: FONTS.mono, fontSize: '11px', color: COLORS.primary, marginBottom: '8px' }}>{timeLabel}</div>}
+              <div style={{ fontFamily: FONTS.mono, fontSize: '14px', fontWeight: 600, color: COLORS.textPrimary, marginBottom: '6px' }}>{s.title}</div>
+              <div style={{ fontFamily: FONTS.sans, fontSize: '12px', color: COLORS.textMuted }}>
+                {s.venue && <span>{'\uD83D\uDCCD'} {s.venue}</span>}
+                {s.venue && s.host && <span> · </span>}
+                {s.host && <span>{s.host}</span>}
+              </div>
+              {s.invite_only && (
+                <span style={{
+                  display: 'inline-block', marginTop: '8px',
+                  fontFamily: FONTS.mono, fontSize: '10px', fontWeight: 600,
+                  padding: '3px 10px', borderRadius: '20px',
+                  background: '#f59e0b22', border: '1px solid #f59e0b44', color: '#f59e0b',
+                }}>INVITE ONLY</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── View Page ──────────────────────────────────────────────────────────────────
 export default function ViewPage() {
   const [sessions, setSessions] = useState([]);
@@ -644,8 +768,19 @@ export default function ViewPage() {
     const map = {}; stages.forEach(st => { map[st.id] = st; }); return map;
   }, [stages]);
 
+  const day0Activations = useMemo(() => {
+    let filtered = sessions.filter(s => s.day === 'day0' && s.type === 'event');
+    if (showBookmarksOnly) filtered = filtered.filter(s => questSaves.includes(s.id));
+    filtered.sort((a, b) => {
+      if (!a.start_time) return 1;
+      if (!b.start_time) return -1;
+      return isoToMinutes(a.start_time) - isoToMinutes(b.start_time);
+    });
+    return filtered;
+  }, [sessions, showBookmarksOnly, questSaves]);
+
   const sessionsByStage = useMemo(() => {
-    let filtered = sessions.filter(s => s.day === selectedDay && s.start_time);
+    let filtered = sessions.filter(s => s.day === selectedDay && s.start_time && s.type !== 'event');
     if (activeTopics.length > 0) filtered = filtered.filter(s => s.topics?.some(t => activeTopics.includes(t)));
     if (showBookmarksOnly) filtered = filtered.filter(s => questSaves.includes(s.id));
     filtered.sort((a, b) => isoToMinutes(a.start_time) - isoToMinutes(b.start_time));
@@ -827,48 +962,86 @@ export default function ViewPage() {
           }}>
             Loading sessions...
           </div>
+        ) : selectedDay === 'day0' ? (
+          /* Day 0 — single vertical activation list */
+          <div style={{ maxWidth: '640px', margin: '0 auto' }}>
+            {day0Activations.length === 0 ? (
+              <div style={{ fontFamily: FONTS.sans, fontSize: '15px', color: COLORS.textMuted, textAlign: 'center', padding: '80px 0', lineHeight: 2 }}>
+                {showBookmarksOnly ? 'No activations saved to your quest yet.' : 'No activations scheduled for Day 0.'}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{
+                  fontFamily: FONTS.mono, fontSize: '12px', color: COLORS.textMuted,
+                  letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px',
+                }}>
+                  Activations ({day0Activations.length})
+                </div>
+                {day0Activations.map(s => (
+                  <ActivationCard
+                    key={s.id}
+                    session={s}
+                    bookmarks={questSaves}
+                    onToggleBookmark={toggleQuestSave}
+                    onClick={() => setSelectedSession(s)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         ) : sessionsByStage.length === 0 ? (
           <div style={{ fontFamily: FONTS.sans, fontSize: '15px', color: COLORS.textMuted, textAlign: 'center', padding: '80px 0', lineHeight: 2 }}>
             {showBookmarksOnly ? 'No sessions saved to your quest yet.' : 'No sessions scheduled.'}
           </div>
         ) : (
-          <div className="view-stage-columns" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-            {sessionsByStage.map(({ stage, sessions: stageSessions }) => (
-              <div key={stage.id} className="view-stage-column" style={{ width: '340px', minWidth: '340px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* Stage header card */}
-                <div style={{
-                  padding: '13px 16px', background: COLORS.bgCard,
-                  border: `1px solid ${COLORS.border}`,
-                  borderTop: `3px solid ${stage.color || COLORS.primary}`,
-                  borderRadius: '12px',
-                }}>
-                  <div style={{ fontFamily: FONTS.mono, fontSize: '13px', fontWeight: 700, color: stage.color || COLORS.primary, letterSpacing: '-0.01em' }}>
-                    {stage.name}
+          <>
+            <div className="view-stage-columns" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+              {sessionsByStage.map(({ stage, sessions: stageSessions }) => (
+                <div key={stage.id} className="view-stage-column" style={{ width: '340px', minWidth: '340px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {/* Stage header card */}
+                  <div style={{
+                    padding: '13px 16px', background: COLORS.bgCard,
+                    border: `1px solid ${COLORS.border}`,
+                    borderTop: `3px solid ${stage.color || COLORS.primary}`,
+                    borderRadius: '12px',
+                  }}>
+                    <div style={{ fontFamily: FONTS.mono, fontSize: '13px', fontWeight: 700, color: stage.color || COLORS.primary, letterSpacing: '-0.01em' }}>
+                      {stage.name}
+                    </div>
+                    <div style={{ fontFamily: FONTS.sans, fontSize: '12px', color: COLORS.textMuted, marginTop: '4px' }}>
+                      {stageSessions.length} {stageSessions.length === 1 ? 'session' : 'sessions'}
+                    </div>
                   </div>
-                  <div style={{ fontFamily: FONTS.sans, fontSize: '12px', color: COLORS.textMuted, marginTop: '4px' }}>
-                    {stageSessions.length} {stageSessions.length === 1 ? 'session' : 'sessions'}
-                  </div>
-                </div>
 
-                {stageSessions.map(s => (
-                  <MissionCard
-                    key={s.id}
-                    session={s}
-                    speakerMap={speakerMap}
-                    stageMap={stageMap}
-                    bookmarks={questSaves}
-                    onToggleBookmark={toggleQuestSave}
-                    isRoundtable={roundtableStageIds.has(s.stage_id)}
-                    registrationCount={rtCountMap[s.id] || 0}
-                    isRegistered={myRtRegistrations.includes(s.id)}
-                    onJoinRoundtable={joinRoundtable}
-                    capacity={s.capacity}
-                    onClick={() => setSelectedSession(s)}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+                  {stageSessions.map(s => (
+                    <MissionCard
+                      key={s.id}
+                      session={s}
+                      speakerMap={speakerMap}
+                      stageMap={stageMap}
+                      bookmarks={questSaves}
+                      onToggleBookmark={toggleQuestSave}
+                      isRoundtable={roundtableStageIds.has(s.stage_id)}
+                      registrationCount={rtCountMap[s.id] || 0}
+                      isRegistered={myRtRegistrations.includes(s.id)}
+                      onJoinRoundtable={joinRoundtable}
+                      capacity={s.capacity}
+                      onClick={() => setSelectedSession(s)}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* Evening Events for Days 1 & 2 */}
+            <ViewEveningEvents
+              sessions={sessions}
+              selectedDay={selectedDay}
+              bookmarks={questSaves}
+              onToggleBookmark={toggleQuestSave}
+              onClick={(s) => setSelectedSession(s)}
+            />
+          </>
         )}
       </main>
 
