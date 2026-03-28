@@ -1205,8 +1205,8 @@ export default function NerdConPlanner() {
       {/* Top Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: '52px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgb(8,8,8)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: '#3568FF', fontFamily: "'Press Start 2P', cursive" }}>FINTECH</span>
-          <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: '#ffffff', fontFamily: "'Press Start 2P', cursive" }}>NERDCON</span>
+          <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: 'rgb(240,240,240)', fontFamily: "'Press Start 2P', cursive" }}>FINTECH</span>
+          <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: 'rgb(240,240,240)', fontFamily: "'Press Start 2P', cursive" }}>NERDCON</span>
           <span style={{ fontSize: '10px', color: 'rgba(240,240,240,0.3)', letterSpacing: '0.1em' }}>SAN DIEGO · NOV 18–20 · OPS</span>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
@@ -1261,18 +1261,18 @@ export default function NerdConPlanner() {
                   return (
                     <div key={hall.id} style={{ flexShrink: 0 }}>
                       <div style={{
-                        height: '52px', background: 'rgb(8,8,8)', borderBottom: '1px solid #3568FF', borderRight: '1px solid rgba(255,255,255,0.06)',
+                        height: '52px', background: 'rgb(8,8,8)', borderBottom: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: `${hallWidth}px`, borderTop: '2px solid #3568FF',
+                        width: `${hallWidth}px`,
                       }}>
-                        <span style={{ fontSize: '11px', color: '#3568FF', letterSpacing: '0.15em', fontWeight: 'bold' }}>{hall.name.toUpperCase()}</span>
+                        <span style={{ fontSize: '11px', color: 'rgba(240,240,240,0.3)', letterSpacing: '0.15em', fontWeight: 'bold' }}>{hall.name.toUpperCase()}</span>
                       </div>
                       <div style={{ display: 'flex' }}>
                         {hall.stages.map(stage => {
                           const maxCols = stage.max_columns || 1;
                           return (
-                            <div key={stage.id} style={{ width: `${STAGE_COL_WIDTH * maxCols}px`, height: '44px', padding: '0 8px', borderBottom: `2px solid ${stage.color}`, borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgb(8,8,8)', boxSizing: 'border-box' }}>
-                              <div style={{ fontSize: '11px', color: stage.color, fontWeight: 'bold', letterSpacing: '0.05em' }}>{stage.name}</div>
+                            <div key={stage.id} style={{ width: `${STAGE_COL_WIDTH * maxCols}px`, height: '44px', padding: '0 8px', borderBottom: '1px solid rgba(255,255,255,0.1)', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255,255,255,0.08)', boxSizing: 'border-box' }}>
+                              <div style={{ fontSize: '11px', color: 'rgb(240,240,240)', fontWeight: 'bold', letterSpacing: '0.05em' }}>{stage.name}</div>
                               <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.2)' }}>{stage.open_from}–{stage.open_until}{maxCols > 1 ? ` · ${maxCols}col` : ''}</div>
                             </div>
                           );
@@ -1289,7 +1289,7 @@ export default function NerdConPlanner() {
                 <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 15, background: 'rgb(18,18,18)' }}>
                   {TIME_SLOTS.map(mins => (
                     <div key={mins} style={{ height: `${SLOT_HEIGHT}px`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', borderBottom: mins % 60 === 0 ? '1px solid rgba(255,255,255,0.06)' : mins % 30 === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                      {mins % 30 === 0 && <span style={{ fontSize: '10px', color: mins % 60 === 0 ? 'rgba(240,240,240,0.35)' : 'rgba(240,240,240,0.15)', fontFamily: 'monospace' }}>{formatTime(mins)}</span>}
+                      {mins % 30 === 0 && <span style={{ fontSize: '12px', color: mins % 60 === 0 ? 'rgba(240,240,240,0.5)' : 'rgba(240,240,240,0.2)', fontFamily: 'monospace' }}>{formatTime(mins)}</span>}
                     </div>
                   ))}
                 </div>
