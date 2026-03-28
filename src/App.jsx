@@ -38,7 +38,7 @@ const generateTimeSlots = () => { const slots = []; for (let m = 8 * 60 + 30; m 
 const TIME_SLOTS = generateTimeSlots();
 const SLOT_HEIGHT = 20;
 const TIME_COL_WIDTH = 72;
-const STAGE_COL_WIDTH = 200;
+const STAGE_COL_WIDTH = 280;
 const SIDEBAR_WIDTH = 280;
 
 function checkOverlap(sessions, stageId, day, startMins, durationMins, excludeId, colIndex) {
