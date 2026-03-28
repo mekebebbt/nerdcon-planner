@@ -1086,6 +1086,85 @@ function RegistrationsModal({ isOpen, onClose, sessions, stages }) {
   );
 }
 
+// ── Manage Speakers Modal ─────────────────────────────────────────────────────
+function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  if (!isOpen) return null;
+
+  const startEdit = (sp) => {
+    setEditingId(sp.id);
+    setForm({ name: sp.name || '', title: sp.title || '', company: sp.company || '', linkedin: sp.linkedin || '' });
+  };
+
+  const cancelEdit = () => { setEditingId(null); setForm({}); };
+
+  const saveEdit = async () => {
+    if (!form.name?.trim()) return;
+    setSaving(true);
+    const updates = { name: form.name.trim(), title: form.title.trim() || null, company: form.company.trim() || null, linkedin: form.linkedin.trim() || null };
+    const { error } = await supabase.from('speakers').update(updates).eq('id', editingId);
+    if (error) { alert(error.message); setSaving(false); return; }
+    onSpeakersChange(speakers.map(s => s.id === editingId ? { ...s, ...updates } : s));
+    setEditingId(null);
+    setForm({});
+    setSaving(false);
+  };
+
+  const sorted = [...speakers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+  return (
+    <ModalShell onClose={onClose} title="Speakers" width="640px">
+      <div style={{ padding: '16px 24px', maxHeight: '60vh', overflowY: 'auto' }}>
+        {sorted.length === 0 ? (
+          <div style={{ color: 'rgba(240,240,240,0.4)', fontSize: '12px', textAlign: 'center', padding: '24px 0' }}>No speakers yet.</div>
+        ) : sorted.map(sp => (
+          <div key={sp.id} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', marginBottom: '6px', background: 'rgb(18,18,18)', padding: '10px 12px' }}>
+            {editingId === sp.id ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                  <div>
+                    <label style={labelStyle}>Name *</label>
+                    <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Title</label>
+                    <input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Company</label>
+                    <input value={form.company} onChange={e => setForm({ ...form, company: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>LinkedIn</label>
+                    <input value={form.linkedin} onChange={e => setForm({ ...form, linkedin: e.target.value })} placeholder="https://linkedin.com/in/..." style={inputStyle} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button onClick={cancelEdit} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '6px 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit' }}>Cancel</button>
+                  <button onClick={saveEdit} disabled={saving || !form.name?.trim()} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '6px 12px', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontSize: '11px', fontFamily: 'inherit', fontWeight: 'bold' }}>{saving ? 'Saving…' : 'Save'}</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', color: 'rgb(240,240,240)', fontWeight: 'bold' }}>{sp.name}</div>
+                  <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {[sp.title, sp.company].filter(Boolean).join(' · ') || '—'}
+                  </div>
+                </div>
+                <button onClick={() => startEdit(sp)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '3px', padding: '3px 8px', color: '#3568FF', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit', flexShrink: 0 }}>Edit</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </ModalShell>
+  );
+}
+
 // ── Day 0 Activations List ────────────────────────────────────────────────────
 function ActivationsList({ sessions, selectedDay, onEdit, onNew }) {
   const activations = sessions
@@ -1227,6 +1306,7 @@ export default function NerdConPlanner() {
   const [dropError, setDropError] = useState(null);
   const [pendingBlock, setPendingBlock] = useState(null);
   const [showRegistrations, setShowRegistrations] = useState(false);
+  const [showSpeakersModal, setShowSpeakersModal] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -1393,6 +1473,7 @@ export default function NerdConPlanner() {
             </div>
           ))}
           <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#3568FF', border: 'none', borderRadius: '8px', padding: '0 16px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold', letterSpacing: '0.05em', height: '32px' }}>+ NEW</button>
+          <button onClick={() => setShowSpeakersModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Manage Speakers">{'\uD83C\uDFA4'}</button>
           <button onClick={() => setShowRegistrations(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Registrations">{'\u{1F465}'}</button>
           <button onClick={() => setShowStagesModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Manage Stages">{'⚙'}</button>
           <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 16px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', letterSpacing: '0.05em', textDecoration: 'none', display: 'flex', alignItems: 'center', height: '32px' }}>VIEW &#8599;</a>
@@ -1527,6 +1608,8 @@ export default function NerdConPlanner() {
       <SessionModal isOpen={showModal} onClose={() => { setShowModal(false); setEditingSession(null); }}
         onSave={handleSave} onDelete={handleDelete} editingSession={editingSession} speakers={speakers} stages={stages} selectedDay={selectedDay}
         onSpeakerAdded={(sp) => setSpeakers(prev => [...prev, sp])} />
+
+      <ManageSpeakersModal isOpen={showSpeakersModal} onClose={() => setShowSpeakersModal(false)} speakers={speakers} onSpeakersChange={setSpeakers} />
 
       <ManageStagesModal isOpen={showStagesModal} onClose={() => setShowStagesModal(false)} stages={stages} onStagesChange={setStages} />
 
