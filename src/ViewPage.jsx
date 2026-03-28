@@ -997,7 +997,7 @@ export default function ViewPage() {
           <>
             <div className="view-stage-columns" style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
               {sessionsByStage.map(({ stage, sessions: stageSessions }) => (
-                <div key={stage.id} className="view-stage-column" style={{ width: '340px', minWidth: '340px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div key={stage.id} className="view-stage-column" style={{ width: '260px', minWidth: '260px', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {/* Stage header card */}
                   <div style={{
                     padding: '13px 16px', background: COLORS.bgCard,
