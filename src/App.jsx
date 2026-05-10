@@ -1448,15 +1448,15 @@ export default function NerdConPlanner() {
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
           <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: 'rgb(240,240,240)', fontFamily: "'Press Start 2P', cursive" }}>FINTECH</span>
           <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: 'rgb(240,240,240)', fontFamily: "'Press Start 2P', cursive" }}>NERDCON</span>
-          <span style={{ fontSize: '10px', color: 'rgba(240,240,240,0.3)', letterSpacing: '0.1em' }}>SAN DIEGO · NOV 18–20 · OPS</span>
+          <span style={{ fontSize: '10px', color: 'rgba(240,240,240,0.55)', letterSpacing: '0.1em' }}>SAN DIEGO · NOV 18–20 · OPS</span>
         </div>
         <div style={{ display: 'flex', gap: '4px' }}>
           {DAYS.map(day => (
             <button key={day.id} onClick={() => setSelectedDay(day.id)} style={{
               padding: '6px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', letterSpacing: '0.05em',
               background: selectedDay === day.id ? '#3568FF' : 'transparent',
-              border: `1px solid ${selectedDay === day.id ? '#3568FF' : 'rgba(255,255,255,0.06)'}`,
-              color: selectedDay === day.id ? '#fff' : 'rgba(240,240,240,0.4)',
+              border: `1px solid ${selectedDay === day.id ? '#3568FF' : 'rgba(255,255,255,0.18)'}`,
+              color: selectedDay === day.id ? '#fff' : 'rgba(240,240,240,0.75)',
               fontWeight: selectedDay === day.id ? 'bold' : 'normal', transition: 'all 0.15s'
             }}>{day.label} · {day.date}</button>
           ))}
@@ -1465,18 +1465,18 @@ export default function NerdConPlanner() {
           {[
             { label: 'CONFIRMED', value: confirmedCount, color: '#3568FF' },
             { label: 'SCHEDULED', value: totalScheduled, color: 'rgb(240,240,240)' },
-            { label: 'CLASHES', value: clashes, color: clashes > 0 ? '#f87171' : 'rgba(240,240,240,0.2)' },
+            { label: 'CLASHES', value: clashes, color: clashes > 0 ? '#f87171' : 'rgba(240,240,240,0.45)' },
           ].map(stat => (
             <div key={stat.label} style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '18px', fontWeight: 'bold', color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-              <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.2)', letterSpacing: '0.1em', marginTop: '2px' }}>{stat.label}</div>
+              <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.55)', letterSpacing: '0.1em', marginTop: '2px' }}>{stat.label}</div>
             </div>
           ))}
           <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#3568FF', border: 'none', borderRadius: '8px', padding: '0 16px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold', letterSpacing: '0.05em', height: '32px' }}>+ NEW</button>
-          <button onClick={() => setShowSpeakersModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Manage Speakers">{'\uD83C\uDFA4'}</button>
-          <button onClick={() => setShowRegistrations(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Registrations">{'\u{1F465}'}</button>
-          <button onClick={() => setShowStagesModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '14px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px' }} title="Manage Stages">{'⚙'}</button>
-          <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'none', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px', padding: '0 16px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', letterSpacing: '0.05em', textDecoration: 'none', display: 'flex', alignItems: 'center', height: '32px' }}>VIEW &#8599;</a>
+          <button onClick={() => setShowSpeakersModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.85)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px', letterSpacing: '0.05em', gap: '6px' }} title="Manage Speakers"><span style={{ fontSize: '14px' }}>{'\uD83C\uDFA4'}</span>SPEAKERS</button>
+          <button onClick={() => setShowRegistrations(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.85)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px', letterSpacing: '0.05em', gap: '6px' }} title="Registrations"><span style={{ fontSize: '14px' }}>{'\u{1F465}'}</span>SIGNUPS</button>
+          <button onClick={() => setShowStagesModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.85)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px', letterSpacing: '0.05em', gap: '6px' }} title="Manage Stages"><span style={{ fontSize: '14px' }}>{'⚙'}</span>STAGES</button>
+          <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'none', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '0 16px', color: 'rgba(240,240,240,0.95)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', letterSpacing: '0.05em', textDecoration: 'none', display: 'flex', alignItems: 'center', height: '32px', fontWeight: 'bold' }}>VIEW &#8599;</a>
         </div>
       </div>
 
