@@ -82,7 +82,7 @@ const getSpeakerRole = (speakers, speakerId) => {
   return entry?.role || 'speaker';
 };
 
-function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded }) {
+function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded, clashInfo, isIgnored, onToggleIgnore }) {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('placeholder');
   const [format, setFormat] = useState('Panel');
@@ -347,6 +347,34 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
           <label style={labelStyle}>Notes (internal)</label>
           <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="Internal notes (not shown to attendees)..." style={{ ...inputStyle, resize: 'vertical' }} />
         </div>
+
+        {/* Speaker clash warning */}
+        {editingSession && clashInfo && (
+          <div style={{
+            padding: '10px 14px', borderRadius: '6px',
+            background: isIgnored ? 'rgba(255,255,255,0.04)' : 'rgba(239,68,68,0.1)',
+            border: `1px solid ${isIgnored ? 'rgba(255,255,255,0.08)' : '#ef4444'}`,
+            display: 'flex', alignItems: 'center', gap: '10px',
+          }}>
+            <span style={{ fontSize: '14px' }}>{isIgnored ? '🔇' : '⚠️'}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: isIgnored ? 'rgba(240,240,240,0.4)' : '#f87171', letterSpacing: '0.05em', textDecoration: isIgnored ? 'line-through' : 'none' }}>
+                SPEAKER CLASH: {[...clashInfo].join(', ')}
+              </div>
+              <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.3)', marginTop: '2px' }}>
+                {isIgnored ? 'Marked as intentional double-book' : 'Same speaker booked on overlapping sessions'}
+              </div>
+            </div>
+            <button onClick={() => onToggleIgnore(editingSession.id)} style={{
+              background: 'none', border: `1px solid ${isIgnored ? '#22c55e' : 'rgba(255,255,255,0.12)'}`,
+              borderRadius: '4px', padding: '4px 10px', cursor: 'pointer',
+              fontSize: '10px', fontFamily: 'inherit', letterSpacing: '0.03em',
+              color: isIgnored ? '#22c55e' : 'rgba(240,240,240,0.5)',
+            }}>
+              {isIgnored ? 'UNIGNORE' : 'IGNORE'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -625,7 +653,7 @@ function SidebarPanel({ sessions, speakers, selectedDay, onEdit, onDragStart, is
 }
 
 // ── Grid Cards ────────────────────────────────────────────────────────────────
-function SessionCard({ session, speakers, onClick, style, onDragStart }) {
+function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo, isClashIgnored }) {
   const statusDef = SESSION_STATUSES.find(s => s.id === session.status) || SESSION_STATUSES[0];
   const sessionSpeakers = speakers.filter(sp => getSpeakerIds(session.speakers).includes(sp.id));
   const topicColor = session.topics?.[0] ? TOPIC_TAG_COLORS[session.topics[0]] : '#3568FF';
@@ -637,6 +665,8 @@ function SessionCard({ session, speakers, onClick, style, onDragStart }) {
   const showFormat = dur >= 20;
   const showSpeakers = dur >= 40;
   const showTopics = dur >= 40;
+  const hasActiveClash = clashInfo && !isClashIgnored;
+  const [showClashTooltip, setShowClashTooltip] = useState(false);
   return (
     <div draggable="true"
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
@@ -649,12 +679,43 @@ function SessionCard({ session, speakers, onClick, style, onDragStart }) {
         borderBottom: '1px solid rgba(255,255,255,0.06)',
         borderLeft: `3px solid ${leftAccent}`,
         borderRadius: '6px', padding: dur < 20 ? '2px 6px' : '6px 8px', cursor: 'grab',
-        overflow: 'hidden', boxSizing: 'border-box', transition: 'opacity 0.15s', zIndex: 10,
+        overflow: 'visible', boxSizing: 'border-box', transition: 'opacity 0.15s', zIndex: 10,
+        boxShadow: hasActiveClash ? '0 0 0 2px #ef4444, 0 0 8px rgba(239,68,68,0.3)' : 'none',
         ...style
       }}
       onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
       onMouseLeave={e => e.currentTarget.style.opacity = '1'}
     >
+      {/* Clash badge */}
+      {clashInfo && (
+        <div
+          onMouseEnter={() => setShowClashTooltip(true)}
+          onMouseLeave={() => setShowClashTooltip(false)}
+          style={{
+            position: 'absolute', top: '-6px', right: '-6px', zIndex: 20,
+            fontSize: '9px', fontWeight: 'bold', letterSpacing: '0.04em',
+            padding: '2px 6px', borderRadius: '4px',
+            background: isClashIgnored ? 'rgba(255,255,255,0.08)' : '#ef4444',
+            color: isClashIgnored ? 'rgba(240,240,240,0.4)' : '#fff',
+            textDecoration: isClashIgnored ? 'line-through' : 'none',
+            cursor: 'default',
+          }}
+        >
+          ⚠ CLASH
+          {showClashTooltip && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: '4px',
+              background: 'rgb(18,18,18)', border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '4px', padding: '6px 10px', whiteSpace: 'nowrap',
+              fontSize: '10px', color: 'rgba(240,240,240,0.7)', fontWeight: 'normal',
+              textDecoration: 'none', zIndex: 30,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+            }}>
+              {isClashIgnored ? '(ignored) ' : ''}{[...clashInfo].join(', ')}
+            </div>
+          )}
+        </div>
+      )}
       {timeLabel && <div style={{ fontSize: '11px', letterSpacing: '0.03em', color: metaColor, lineHeight: 1, marginBottom: dur < 20 ? '1px' : '3px', fontWeight: 500 }}>{timeLabel}</div>}
       <div style={{ fontSize: dur < 20 ? '11px' : '13px', fontWeight: 'bold', letterSpacing: '0.04em', color: statusDef.textColor, textTransform: 'uppercase', lineHeight: 1.2, marginBottom: showFormat ? '4px' : 0, whiteSpace: dur < 20 ? 'nowrap' : undefined, overflow: dur < 20 ? 'hidden' : undefined, textOverflow: dur < 20 ? 'ellipsis' : undefined }}>{session.title}</div>
       {showFormat && session.format && <div style={{ marginBottom: '3px' }}><span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '2px', background: leftAccent + '18', color: metaColor, letterSpacing: '0.04em' }}>{session.format}</span></div>}
@@ -692,7 +753,7 @@ function BlockCard({ session, onClick, style, onDragStart }) {
 }
 
 // ── Slot renderer (absolute positioning) ──────────────────────────────────────
-function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIndex, colWidth, isLastCol, dropError, handleDrop, onDragStart, dragSessionRef, openNewSession, onEditSession }) {
+function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIndex, colWidth, isLastCol, dropError, handleDrop, onDragStart, dragSessionRef, openNewSession, onEditSession, speakerClashes, ignoredClashes }) {
   const gridStart = TIME_SLOTS[0];
   const gridEnd = TIME_SLOTS[TIME_SLOTS.length - 1] + 5;
   const totalHeight = TIME_SLOTS.length * SLOT_HEIGHT;
@@ -768,7 +829,7 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
         if (session.type === 'block') {
           return <BlockCard key={session.id} session={session} onClick={() => onEditSession(session)} onDragStart={onDragStart} style={cardStyle} />;
         }
-        return <SessionCard key={session.id} session={session} speakers={speakers} onClick={() => onEditSession(session)} onDragStart={onDragStart} style={cardStyle} />;
+        return <SessionCard key={session.id} session={session} speakers={speakers} onClick={() => onEditSession(session)} onDragStart={onDragStart} style={cardStyle} clashInfo={speakerClashes?.[session.id]} isClashIgnored={ignoredClashes?.has(session.id)} />;
       })}
     </div>
   );
@@ -1307,6 +1368,18 @@ export default function NerdConPlanner() {
   const [pendingBlock, setPendingBlock] = useState(null);
   const [showRegistrations, setShowRegistrations] = useState(false);
   const [showSpeakersModal, setShowSpeakersModal] = useState(false);
+  const [ignoredClashes, setIgnoredClashes] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('nerdcon-ignored-clashes') || '[]')); }
+    catch { return new Set(); }
+  });
+  const toggleIgnoreClash = (sessionId) => {
+    setIgnoredClashes(prev => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId); else next.add(sessionId);
+      localStorage.setItem('nerdcon-ignored-clashes', JSON.stringify([...next]));
+      return next;
+    });
+  };
 
   useEffect(() => { loadData(); }, []);
 
@@ -1428,6 +1501,35 @@ export default function NerdConPlanner() {
     return count;
   }, [daySessions]);
 
+  const speakerClashes = useMemo(() => {
+    const clashMap = {};
+    const list = daySessions.filter(s => s.start_time && s.type !== 'block');
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        const aPencilledOrConfirmed = a.status === 'pencilled' || a.status === 'confirmed';
+        const bPencilledOrConfirmed = b.status === 'pencilled' || b.status === 'confirmed';
+        if (!aPencilledOrConfirmed && !bPencilledOrConfirmed) continue;
+        const aStart = isoToMinutes(a.start_time), aEnd = aStart + a.duration_minutes;
+        const bStart = isoToMinutes(b.start_time), bEnd = bStart + b.duration_minutes;
+        if (!(aStart < bEnd && bStart < aEnd)) continue;
+        const shared = getSpeakerIds(a.speakers).filter(id => getSpeakerIds(b.speakers).includes(id));
+        if (shared.length) {
+          (clashMap[a.id] ||= new Set()); (clashMap[b.id] ||= new Set());
+          shared.forEach(id => {
+            const name = speakers.find(sp => sp.id === id)?.name || 'Speaker';
+            clashMap[a.id].add(name); clashMap[b.id].add(name);
+          });
+        }
+      }
+    }
+    return clashMap;
+  }, [daySessions, speakers]);
+
+  const speakerClashCount = useMemo(() => {
+    return Object.keys(speakerClashes).filter(id => !ignoredClashes.has(id)).length;
+  }, [speakerClashes, ignoredClashes]);
+
   const halls = useMemo(() => {
     const map = {};
     stages.filter(s => (s.max_columns || 1) === 1).forEach(s => {
@@ -1465,7 +1567,8 @@ export default function NerdConPlanner() {
           {[
             { label: 'CONFIRMED', value: confirmedCount, color: '#3568FF' },
             { label: 'SCHEDULED', value: totalScheduled, color: 'rgb(240,240,240)' },
-            { label: 'CLASHES', value: clashes, color: clashes > 0 ? '#f87171' : 'rgba(240,240,240,0.45)' },
+            { label: 'OVERLAPS', value: clashes, color: clashes > 0 ? '#f87171' : 'rgba(240,240,240,0.45)' },
+            { label: 'SPK CLASH', value: speakerClashCount, color: speakerClashCount > 0 ? '#ef4444' : 'rgba(240,240,240,0.45)' },
           ].map(stat => (
             <div key={stat.label} style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '18px', fontWeight: 'bold', color: stat.color, lineHeight: 1 }}>{stat.value}</div>
@@ -1569,6 +1672,8 @@ export default function NerdConPlanner() {
                                 dragSessionRef={dragSessionRef}
                                 openNewSession={openNewSession}
                                 onEditSession={onEditSession}
+                                speakerClashes={speakerClashes}
+                                ignoredClashes={ignoredClashes}
                               />
                             );
                           })}
@@ -1607,7 +1712,10 @@ export default function NerdConPlanner() {
 
       <SessionModal isOpen={showModal} onClose={() => { setShowModal(false); setEditingSession(null); }}
         onSave={handleSave} onDelete={handleDelete} editingSession={editingSession} speakers={speakers} stages={stages} selectedDay={selectedDay}
-        onSpeakerAdded={(sp) => setSpeakers(prev => [...prev, sp])} />
+        onSpeakerAdded={(sp) => setSpeakers(prev => [...prev, sp])}
+        clashInfo={editingSession ? speakerClashes[editingSession.id] : null}
+        isIgnored={editingSession ? ignoredClashes.has(editingSession.id) : false}
+        onToggleIgnore={toggleIgnoreClash} />
 
       <ManageSpeakersModal isOpen={showSpeakersModal} onClose={() => setShowSpeakersModal(false)} speakers={speakers} onSpeakersChange={setSpeakers} />
 
