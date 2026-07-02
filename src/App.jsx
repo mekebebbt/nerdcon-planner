@@ -7,6 +7,30 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// ── Build-view design tokens ("dark cockpit, light worktable") ───────────────
+const BV = {
+  paper: '#F7F5EF', paperLine: '#E5E1D6', paperLineSoft: '#EEEBE2',
+  ink: '#1A1A17', inkSoft: '#6B6860', inkFaint: '#9C988D',
+  cockpit: '#15161A', cockpitLine: '#2A2C33',
+  card: '#ffffff', cardBorder: '#E5E1D6', cardShadow: '0 1px 2px rgba(20,20,15,.04)',
+  cardHoverShadow: '0 4px 12px rgba(20,20,15,.12)',
+  clash: '#DC2626', open: '#16A34A',
+  mono: "'SF Mono',ui-monospace,'Cascadia Code',Menlo,monospace",
+  sans: "'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif",
+};
+const TYPE_SPINE = {
+  Keynote: '#C2410C', Panel: '#2563EB', Podcast: '#7C3AED', Workshop: '#0D9488',
+  Roundtable: '#CA8A04', 'Fireside Chat': '#DB2777', Demo: '#059669',
+  Bootcamp: '#0369A1', Interview: '#9333EA', 'Q&A': '#B45309',
+  Rant: '#E63917',
+};
+const TYPE_TAG_BG = {
+  Keynote: '#FDEBE2', Panel: '#E4ECFE', Podcast: '#EEE6FD', Workshop: '#DCF5F1',
+  Roundtable: '#FEF3C7', 'Fireside Chat': '#FCE7F3', Demo: '#D1FAE5',
+  Bootcamp: '#DBEAFE', Interview: '#EDE9FE', 'Q&A': '#FEF3C7',
+  Rant: '#FEE2E2',
+};
+
 const DAYS = [
   { id: 'day0', label: 'Day 0', date: 'Nov 18', full: '2026-11-18' },
   { id: 'day1', label: 'Day 1', date: 'Nov 19', full: '2026-11-19' },
@@ -68,18 +92,36 @@ const inputStyle = { width: '100%', background: 'rgb(18,18,18)', border: '1px so
 const labelStyle = { display: 'block', color: 'rgba(240,240,240,0.4)', fontSize: '11px', letterSpacing: '0.1em', marginBottom: '6px', textTransform: 'uppercase' };
 
 // ── Session Modal ─────────────────────────────────────────────────────────────
-// Helper to normalize speakers from old flat array or new object format
+// Helper to normalize speakers from old flat array or new participant model
 const normalizeSpeakers = (speakers) => {
   if (!speakers || !Array.isArray(speakers)) return [];
   return speakers.map(s => {
-    if (typeof s === 'string') return { speaker_id: s, role: 'speaker' };
-    return s;
+    if (typeof s === 'string') return { speaker_id: s, role: 'speaker', kind: 'speaker', status: 'confirmed' };
+    return { kind: 'speaker', status: 'confirmed', role: s.role || 'speaker', ...s };
   });
 };
-const getSpeakerIds = (speakers) => normalizeSpeakers(speakers).map(s => s.speaker_id);
+const getSpeakerIds = (speakers) => normalizeSpeakers(speakers).filter(s => s.kind === 'speaker' && s.speaker_id).map(s => s.speaker_id);
 const getSpeakerRole = (speakers, speakerId) => {
   const entry = normalizeSpeakers(speakers).find(s => s.speaker_id === speakerId);
   return entry?.role || 'speaker';
+};
+const getSeatDisplay = (sessionSpeakers, speakersArr, allSpeakers) => {
+  const normalized = normalizeSpeakers(speakersArr);
+  const seats = [];
+  for (const entry of normalized) {
+    if (entry.kind === 'speaker' && entry.speaker_id) {
+      const sp = allSpeakers.find(s => s.id === entry.speaker_id);
+      if (!sp) continue;
+      const prefix = entry.role === 'moderator' ? '[MOD] ' : '';
+      const suffix = entry.status === 'provisional' ? ' (TBC)' : '';
+      seats.push({ text: `${prefix}${sp.name}${suffix}`, provisional: entry.status === 'provisional', kind: 'speaker' });
+    } else if (entry.kind === 'company') {
+      seats.push({ text: entry.label || 'Company TBD', provisional: true, kind: 'company' });
+    } else if (entry.kind === 'guest') {
+      seats.push({ text: entry.label || 'Guest TBD', provisional: true, kind: 'guest' });
+    }
+  }
+  return seats;
 };
 
 function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded, clashInfo, isIgnored, onToggleIgnore }) {
@@ -89,6 +131,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [duration, setDuration] = useState(30);
   const [startTime, setStartTime] = useState('09:00');
   const [selectedSpeakers, setSelectedSpeakers] = useState([]);
+  const [speakerSearch, setSpeakerSearch] = useState('');
   const [topics, setTopics] = useState([]);
   const [notes, setNotes] = useState('');
   const [description, setDescription] = useState('');
@@ -102,6 +145,9 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [newSpkCompany, setNewSpkCompany] = useState('');
   const [addingSpk, setAddingSpk] = useState(false);
   const [showAddSpk, setShowAddSpk] = useState(false);
+  const [companyInput, setCompanyInput] = useState('');
+  const [guestInput, setGuestInput] = useState('');
+  const [showAddPlaceholder, setShowAddPlaceholder] = useState(false);
 
   const handleAddSpeaker = async () => {
     if (!newSpkName.trim() || addingSpk) return;
@@ -116,7 +162,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
     if (error) { alert(error.message); setAddingSpk(false); return; }
     const newSpeaker = data[0];
     if (onSpeakerAdded) onSpeakerAdded(newSpeaker);
-    setSelectedSpeakers(prev => [...prev, { speaker_id: newSpeaker.id, role: 'speaker' }]);
+    setSelectedSpeakers(prev => [...prev, { speaker_id: newSpeaker.id, role: 'speaker', kind: 'speaker', status: 'confirmed' }]);
     setNewSpkName(''); setNewSpkTitle(''); setNewSpkCompany('');
     setAddingSpk(false);
   };
@@ -130,6 +176,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setFormat(editingSession.format || 'Panel');
       setDuration(editingSession.duration_minutes || 30);
       setSelectedSpeakers(normalizeSpeakers(editingSession.speakers));
+      setSpeakerSearch(''); setCompanyInput(''); setGuestInput(''); setShowAddPlaceholder(false);
       setTopics(editingSession.topics || []);
       setNotes(editingSession.notes || '');
       setDescription(editingSession.description || '');
@@ -141,7 +188,8 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       if (editingSession.start_time) setStartTime(formatTime24(isoToMinutes(editingSession.start_time)));
     } else {
       setTitle(''); setStatus('placeholder'); setFormat('Panel');
-      setDuration(30); setStartTime('09:00'); setSelectedSpeakers([]);
+      setDuration(30); setStartTime('09:00'); setSelectedSpeakers([]); setSpeakerSearch('');
+      setCompanyInput(''); setGuestInput(''); setShowAddPlaceholder(false);
       setTopics([]); setNotes(''); setDescription(''); setStageId(stages[0]?.id || '');
       setCapacity(''); setVenue(''); setHost(''); setInviteOnly(false);
     }
@@ -269,8 +317,14 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
             </div>
             <div>
               <label style={labelStyle}>Speakers</label>
+              <input type="text" placeholder="Search speakers…" value={speakerSearch} onChange={e => setSpeakerSearch(e.target.value)}
+                style={{ ...inputStyle, marginBottom: '8px', fontSize: '12px', padding: '6px 10px' }} />
               <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {speakers.map(sp => {
+                {speakers.filter(sp => {
+                  if (!speakerSearch.trim()) return true;
+                  const q = speakerSearch.toLowerCase();
+                  return (sp.name || '').toLowerCase().includes(q) || (sp.title || '').toLowerCase().includes(q) || (sp.company || '').toLowerCase().includes(q);
+                }).map(sp => {
                   const entry = selectedSpeakers.find(s => s.speaker_id === sp.id);
                   const isSelected = !!entry;
                   return (
@@ -283,14 +337,28 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                       <input type="checkbox" checked={isSelected} onChange={() => {
                         setSelectedSpeakers(prev => isSelected
                           ? prev.filter(s => s.speaker_id !== sp.id)
-                          : [...prev, { speaker_id: sp.id, role: 'speaker' }]
+                          : [...prev, { speaker_id: sp.id, role: 'speaker', kind: 'speaker', status: 'confirmed' }]
                         );
                       }} style={{ accentColor: '#3568FF', flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
                         <div style={{ color: 'rgb(240,240,240)', fontSize: '13px' }}>{sp.name}</div>
                         <div style={{ color: 'rgba(240,240,240,0.4)', fontSize: '11px' }}>{sp.title} · {sp.company}</div>
                       </div>
-                      {isSelected && (
+                      {isSelected && (<>
+                        <button onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSpeakers(prev => prev.map(s =>
+                            s.speaker_id === sp.id ? { ...s, status: s.status === 'confirmed' ? 'provisional' : 'confirmed' } : s
+                          ));
+                        }} style={{
+                          background: entry.status === 'provisional' ? 'rgba(234,179,8,0.15)' : 'rgba(34,197,94,0.15)',
+                          border: `1px solid ${entry.status === 'provisional' ? '#eab308' : '#22c55e'}`,
+                          borderRadius: '3px', padding: '2px 6px', cursor: 'pointer', fontSize: '8px',
+                          color: entry.status === 'provisional' ? '#eab308' : '#22c55e',
+                          letterSpacing: '0.05em', fontFamily: 'inherit', flexShrink: 0,
+                        }}>
+                          {entry.status === 'provisional' ? 'TBC' : 'OK'}
+                        </button>
                         <button onClick={(e) => {
                           e.stopPropagation();
                           setSelectedSpeakers(prev => prev.map(s =>
@@ -305,7 +373,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                         }}>
                           {entry.role === 'moderator' ? 'MOD' : 'SPK'}
                         </button>
-                      )}
+                      </>)}
                     </div>
                   );
                 })}
@@ -332,6 +400,85 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                   }}>{addingSpk ? 'Adding…' : 'Add Speaker'}</button>
                 </div>
               )}
+              {/* Collapsible Add Placeholder Form */}
+              <button onClick={() => setShowAddPlaceholder(prev => !prev)} style={{
+                marginTop: '6px', background: 'none', border: `1px dashed rgba(255,255,255,0.08)`, borderRadius: '6px',
+                padding: '8px 12px', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit',
+                color: 'rgba(240,240,240,0.4)', letterSpacing: '0.05em', textTransform: 'uppercase', width: '100%', textAlign: 'left',
+              }}>
+                {showAddPlaceholder ? '▾' : '▸'} Add placeholder seat
+              </button>
+              {showAddPlaceholder && (
+                <div style={{ marginTop: '6px', padding: '10px', background: 'rgb(13,13,13)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input value={companyInput} onChange={e => setCompanyInput(e.target.value)} placeholder="Company name" style={{ ...inputStyle, flex: 1 }}
+                      onKeyDown={e => { if (e.key === 'Enter' && companyInput.trim()) {
+                        setSelectedSpeakers(prev => [...prev, { kind: 'company', label: companyInput.trim(), status: 'provisional', role: 'speaker' }]);
+                        setCompanyInput('');
+                      }}} />
+                    <button onClick={() => { if (companyInput.trim()) {
+                      setSelectedSpeakers(prev => [...prev, { kind: 'company', label: companyInput.trim(), status: 'provisional', role: 'speaker' }]);
+                      setCompanyInput('');
+                    }}} disabled={!companyInput.trim()} style={{
+                      background: companyInput.trim() ? '#7C3AED' : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '4px',
+                      padding: '6px 12px', color: companyInput.trim() ? '#fff' : 'rgba(240,240,240,0.4)', cursor: companyInput.trim() ? 'pointer' : 'default',
+                      fontSize: '10px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.03em', whiteSpace: 'nowrap',
+                    }}>+ Company</button>
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input value={guestInput} onChange={e => setGuestInput(e.target.value)} placeholder="Guest description" style={{ ...inputStyle, flex: 1 }}
+                      onKeyDown={e => { if (e.key === 'Enter' && guestInput.trim()) {
+                        setSelectedSpeakers(prev => [...prev, { kind: 'guest', label: guestInput.trim(), status: 'provisional', role: 'speaker' }]);
+                        setGuestInput('');
+                      }}} />
+                    <button onClick={() => { if (guestInput.trim()) {
+                      setSelectedSpeakers(prev => [...prev, { kind: 'guest', label: guestInput.trim(), status: 'provisional', role: 'speaker' }]);
+                      setGuestInput('');
+                    }}} disabled={!guestInput.trim()} style={{
+                      background: guestInput.trim() ? '#0D9488' : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: '4px',
+                      padding: '6px 12px', color: guestInput.trim() ? '#fff' : 'rgba(240,240,240,0.4)', cursor: guestInput.trim() ? 'pointer' : 'default',
+                      fontSize: '10px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.03em', whiteSpace: 'nowrap',
+                    }}>+ Guest</button>
+                  </div>
+                </div>
+              )}
+              {/* Placeholder seats list */}
+              {selectedSpeakers.filter(s => s.kind === 'company' || s.kind === 'guest').length > 0 && (
+                <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.3)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '2px' }}>Placeholder Seats</div>
+                  {selectedSpeakers.map((seat, idx) => {
+                    if (seat.kind !== 'company' && seat.kind !== 'guest') return null;
+                    const kindColor = seat.kind === 'company' ? '#7C3AED' : '#0D9488';
+                    return (
+                      <div key={`ph-${idx}`} style={{
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px',
+                        background: 'rgba(255,255,255,0.03)', border: `1px solid ${kindColor}33`,
+                        borderRadius: '4px',
+                      }}>
+                        <span style={{ fontSize: '9px', color: kindColor, letterSpacing: '0.06em', fontWeight: 600, textTransform: 'uppercase', flexShrink: 0 }}>
+                          {seat.kind === 'company' ? 'CO' : 'GST'}
+                        </span>
+                        <span style={{ flex: 1, fontSize: '12px', color: 'rgb(220,220,220)', fontStyle: 'italic' }}>{seat.label}</span>
+                        <button onClick={() => setSelectedSpeakers(prev => prev.map((s, i) =>
+                          i === idx ? { ...s, status: s.status === 'confirmed' ? 'provisional' : 'confirmed' } : s
+                        ))} style={{
+                          background: seat.status === 'provisional' ? 'rgba(234,179,8,0.15)' : 'rgba(34,197,94,0.15)',
+                          border: `1px solid ${seat.status === 'provisional' ? '#eab308' : '#22c55e'}`,
+                          borderRadius: '3px', padding: '2px 6px', cursor: 'pointer', fontSize: '8px',
+                          color: seat.status === 'provisional' ? '#eab308' : '#22c55e',
+                          letterSpacing: '0.05em', fontFamily: 'inherit', flexShrink: 0,
+                        }}>
+                          {seat.status === 'provisional' ? 'TBC' : 'OK'}
+                        </button>
+                        <button onClick={() => setSelectedSpeakers(prev => prev.filter((_, i) => i !== idx))} style={{
+                          background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '3px',
+                          padding: '2px 6px', cursor: 'pointer', fontSize: '10px', color: 'rgba(240,240,240,0.3)', fontFamily: 'inherit',
+                        }}>×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </>
         )}
@@ -352,17 +499,17 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
         {editingSession && clashInfo && (
           <div style={{
             padding: '10px 14px', borderRadius: '6px',
-            background: isIgnored ? 'rgba(255,255,255,0.04)' : 'rgba(239,68,68,0.1)',
+            background: isIgnored ? 'rgba(255,255,255,0.04)' : clashInfo?.tier === 'hard' ? 'rgba(239,68,68,0.1)' : 'rgba(234,179,8,0.08)',
             border: `1px solid ${isIgnored ? 'rgba(255,255,255,0.08)' : '#ef4444'}`,
             display: 'flex', alignItems: 'center', gap: '10px',
           }}>
             <span style={{ fontSize: '14px' }}>{isIgnored ? '🔇' : '⚠️'}</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '11px', fontWeight: 'bold', color: isIgnored ? 'rgba(240,240,240,0.4)' : '#f87171', letterSpacing: '0.05em', textDecoration: isIgnored ? 'line-through' : 'none' }}>
-                SPEAKER CLASH: {[...clashInfo].join(', ')}
+              <div style={{ fontSize: '11px', fontWeight: 'bold', color: isIgnored ? 'rgba(240,240,240,0.4)' : clashInfo?.tier === 'hard' ? '#f87171' : '#eab308', letterSpacing: '0.05em', textDecoration: isIgnored ? 'line-through' : 'none' }}>
+                {clashInfo?.tier === 'hard' ? 'HARD' : 'SOFT'} CLASH: {[...clashInfo.names].join(', ')}
               </div>
               <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.3)', marginTop: '2px' }}>
-                {isIgnored ? 'Marked as intentional double-book' : 'Same speaker booked on overlapping sessions'}
+                {isIgnored ? 'Marked as intentional double-book' : clashInfo?.tier === 'hard' ? 'Confirmed speakers double-booked on overlapping sessions' : 'Provisional speakers overlap (not yet confirmed)'}
               </div>
             </div>
             <button onClick={() => onToggleIgnore(editingSession.id)} style={{
@@ -609,10 +756,14 @@ function SidebarCard({ session, speakers, onClick, onDragStart }) {
         <span style={{ fontSize: '9px', padding: '1px 6px', borderRadius: '3px', background: statusDef.border + '33', color: metaColor, letterSpacing: '0.05em', opacity: 0.7 }}>{session.format || 'TBD'}</span>
         <span style={{ fontSize: '10px', color: metaColor, opacity: 0.6 }}>{session.duration_minutes}m</span>
       </div>
-      {sessionSpeakers.length > 0 && <div style={{ fontSize: '10px', color: metaColor, marginTop: '4px', opacity: 0.7 }}>{sessionSpeakers.map(sp => {
-        const role = getSpeakerRole(session.speakers, sp.id);
-        return role === 'moderator' ? `[MOD] ${sp.name}` : sp.name;
-      }).join(', ')}</div>}
+      {(() => { const seats = getSeatDisplay(sessionSpeakers, session.speakers, speakers); return seats.length > 0 && (
+        <div style={{ fontSize: '10px', color: metaColor, marginTop: '4px', opacity: 0.7 }}>
+          {seats.map((s, i) => <span key={i} style={{
+            ...(s.provisional ? { opacity: 0.7, fontStyle: 'italic' } : {}),
+            ...(s.kind !== 'speaker' ? { fontStyle: 'italic' } : {}),
+          }}>{i > 0 ? ', ' : ''}{s.text}</span>)}
+        </div>
+      ); })()}
     </div>
   );
 }
@@ -654,37 +805,42 @@ function SidebarPanel({ sessions, speakers, selectedDay, onEdit, onDragStart, is
 
 // ── Grid Cards ────────────────────────────────────────────────────────────────
 function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo, isClashIgnored }) {
-  const statusDef = SESSION_STATUSES.find(s => s.id === session.status) || SESSION_STATUSES[0];
   const sessionSpeakers = speakers.filter(sp => getSpeakerIds(session.speakers).includes(sp.id));
-  const topicColor = session.topics?.[0] ? TOPIC_TAG_COLORS[session.topics[0]] : '#3568FF';
   const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
   const timeLabel = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(startMins + session.duration_minutes)}` : null;
-  const metaColor = statusDef.textColor;
-  const leftAccent = topicColor;
   const dur = session.duration_minutes || 0;
-  const showFormat = dur >= 20;
-  const showSpeakers = dur >= 40;
-  const showTopics = dur >= 40;
+  const spineColor = TYPE_SPINE[session.format] || BV.inkFaint;
+  const tagBg = TYPE_TAG_BG[session.format] || BV.paperLineSoft;
   const hasActiveClash = clashInfo && !isClashIgnored;
   const [showClashTooltip, setShowClashTooltip] = useState(false);
+
+  const isPlaceholder = session.status === 'placeholder';
+  const isPencilled = session.status === 'pencilled';
+  const borderStyle = isPlaceholder ? 'dashed' : 'solid';
+  const borderColor = isPlaceholder ? BV.paperLine : isPencilled ? '#d97706' : BV.cardBorder;
+  const cardBg = isPlaceholder
+    ? `repeating-linear-gradient(45deg,${BV.card},${BV.card} 7px,#F4F2EA 7px,#F4F2EA 14px)`
+    : BV.card;
+  const titleColor = isPlaceholder ? BV.inkSoft : BV.ink;
+
   return (
     <div draggable="true"
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
       onClick={onClick} style={{
-        margin: '0 2px',
+        margin: '0 5px',
         position: 'relative',
-        background: 'rgb(13,13,13)',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        borderRight: '1px solid rgba(255,255,255,0.06)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        borderLeft: `3px solid ${leftAccent}`,
-        borderRadius: '6px', padding: dur < 20 ? '2px 6px' : '6px 8px', cursor: 'grab',
-        overflow: 'visible', boxSizing: 'border-box', transition: 'opacity 0.15s', zIndex: 10,
-        boxShadow: hasActiveClash ? '0 0 0 2px #ef4444, 0 0 8px rgba(239,68,68,0.3)' : 'none',
+        background: cardBg,
+        border: `1px ${borderStyle} ${borderColor}`,
+        borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: spineColor,
+        borderRadius: '7px', padding: dur < 20 ? '2px 7px' : '7px 9px', cursor: 'grab',
+        overflow: 'visible', boxSizing: 'border-box',
+        boxShadow: hasActiveClash ? `0 0 0 2px ${BV.clash}33, ${BV.cardShadow}` : BV.cardShadow,
+        transition: 'box-shadow .12s, transform .06s', zIndex: 10,
+        fontFamily: BV.sans,
         ...style
       }}
-      onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = hasActiveClash ? `0 0 0 2px ${BV.clash}33, ${BV.cardHoverShadow}` : BV.cardHoverShadow; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.boxShadow = hasActiveClash ? `0 0 0 2px ${BV.clash}33, ${BV.cardShadow}` : BV.cardShadow; e.currentTarget.style.transform = 'none'; }}
     >
       {/* Clash badge */}
       {clashInfo && (
@@ -692,62 +848,86 @@ function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo
           onMouseEnter={() => setShowClashTooltip(true)}
           onMouseLeave={() => setShowClashTooltip(false)}
           style={{
-            position: 'absolute', top: '-6px', right: '-6px', zIndex: 20,
-            fontSize: '9px', fontWeight: 'bold', letterSpacing: '0.04em',
-            padding: '2px 6px', borderRadius: '4px',
-            background: isClashIgnored ? 'rgba(255,255,255,0.08)' : '#ef4444',
-            color: isClashIgnored ? 'rgba(240,240,240,0.4)' : '#fff',
+            position: 'absolute', top: '6px', right: '7px', zIndex: 20,
+            fontFamily: BV.mono, fontSize: '7.5px', fontWeight: 700, letterSpacing: '0.5px',
+            padding: '1.5px 4px', borderRadius: '3px',
+            background: isClashIgnored ? BV.paperLineSoft : clashInfo?.tier === 'hard' ? '#FEE2E2' : '#FEF9C3',
+            color: isClashIgnored ? BV.inkFaint : clashInfo?.tier === 'hard' ? BV.clash : '#a16207',
             textDecoration: isClashIgnored ? 'line-through' : 'none',
             cursor: 'default',
           }}
         >
-          ⚠ CLASH
+          {clashInfo?.tier === 'hard' ? '⚠ CLASH' : '⚠ SOFT'}
           {showClashTooltip && (
             <div style={{
               position: 'absolute', top: '100%', right: 0, marginTop: '4px',
-              background: 'rgb(18,18,18)', border: '1px solid rgba(255,255,255,0.12)',
+              background: BV.cockpit, border: `1px solid ${BV.cockpitLine}`,
               borderRadius: '4px', padding: '6px 10px', whiteSpace: 'nowrap',
-              fontSize: '10px', color: 'rgba(240,240,240,0.7)', fontWeight: 'normal',
+              fontSize: '10px', color: '#D4D6DC', fontWeight: 'normal',
               textDecoration: 'none', zIndex: 30,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
             }}>
-              {isClashIgnored ? '(ignored) ' : ''}{[...clashInfo].join(', ')}
+              {isClashIgnored ? '(ignored) ' : ''}{clashInfo?.tier === 'hard' ? 'HARD: ' : 'SOFT: '}{[...(clashInfo?.names || [])].join(', ')}
             </div>
           )}
         </div>
       )}
-      {timeLabel && <div style={{ fontSize: '11px', letterSpacing: '0.03em', color: metaColor, lineHeight: 1, marginBottom: dur < 20 ? '1px' : '3px', fontWeight: 500 }}>{timeLabel}</div>}
-      <div style={{ fontSize: dur < 20 ? '11px' : '13px', fontWeight: 'bold', letterSpacing: '0.04em', color: statusDef.textColor, textTransform: 'uppercase', lineHeight: 1.2, marginBottom: showFormat ? '4px' : 0, whiteSpace: dur < 20 ? 'nowrap' : undefined, overflow: dur < 20 ? 'hidden' : undefined, textOverflow: dur < 20 ? 'ellipsis' : undefined }}>{session.title}</div>
-      {showFormat && session.format && <div style={{ marginBottom: '3px' }}><span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '2px', background: leftAccent + '18', color: metaColor, letterSpacing: '0.04em' }}>{session.format}</span></div>}
-      {sessionSpeakers.length > 0 && <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', lineHeight: 1.3, marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sessionSpeakers.slice(0, 3).map(s => s.name).join(', ')}{sessionSpeakers.length > 3 ? ` +${sessionSpeakers.length - 3}` : ''}</div>}
-      {showTopics && session.topics?.[0] && <div style={{ fontSize: '10px', color: topicColor, marginTop: '3px', opacity: 0.8 }}>{session.topics[0]}{session.topics[1] ? `, ${session.topics[1]}` : ''}</div>}
+      {timeLabel && <div style={{ fontFamily: BV.mono, fontSize: '9.5px', letterSpacing: '0.3px', color: BV.inkSoft, lineHeight: 1, marginBottom: dur < 20 ? '1px' : '2px' }}>{timeLabel}</div>}
+      <div style={{ fontSize: dur < 20 ? '11px' : '12.5px', fontWeight: 650, letterSpacing: '-0.15px', color: titleColor, lineHeight: 1.18, marginBottom: '2px', whiteSpace: dur < 20 ? 'nowrap' : undefined, overflow: dur < 20 ? 'hidden' : undefined, textOverflow: dur < 20 ? 'ellipsis' : undefined }}>{session.title}</div>
+      {(() => { const seats = getSeatDisplay(sessionSpeakers, session.speakers, speakers); return seats.length > 0 && (
+        <div style={{ fontSize: '10.5px', color: BV.inkSoft, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {seats.slice(0, 3).map((s, i) => <span key={i} style={{
+            ...(s.provisional ? { opacity: 0.6, fontStyle: 'italic' } : {}),
+            ...(s.kind !== 'speaker' ? { fontStyle: 'italic' } : {}),
+          }}>{i > 0 ? ', ' : ''}{s.text}</span>)}{seats.length > 3 ? ` +${seats.length - 3}` : ''}
+        </div>
+      ); })()}
+      {dur >= 20 && session.format && <div style={{ marginTop: '5px' }}><span style={{ fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.6px', textTransform: 'uppercase', padding: '1.5px 5px', borderRadius: '3px', fontWeight: 600, background: tagBg, color: spineColor }}>{session.format}</span></div>}
     </div>
   );
 }
 
 function BlockCard({ session, onClick, style, onDragStart }) {
   const blockDef = BLOCK_TYPES.find(b => b.id === session.block_type);
-  const color = blockDef?.color || '#6b7280';
-  const bgColor = blockDef?.bgColor || '#1a1a1a';
-  const stripeColor = blockDef?.stripeColor || color;
+  const isMarker = session.block_type === 'stage-open' || session.block_type === 'stage-close';
   const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
-  const timeLabel = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(startMins + session.duration_minutes)}` : null;
+  const timeLabel = startMins !== null ? formatTime24(startMins) : null;
+
+  if (isMarker) {
+    const isOpen = session.block_type === 'stage-open';
+    return (
+      <div draggable="true"
+        onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
+        onClick={onClick} style={{
+          margin: '0 5px', position: 'absolute', left: 0, right: 0,
+          height: '18px', borderRadius: '4px', cursor: 'grab',
+          background: isOpen ? '#DCFCE7' : '#FEE2E2',
+          color: isOpen ? BV.open : BV.clash,
+          fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.5px', fontWeight: 600,
+          display: 'flex', alignItems: 'center', paddingLeft: '7px', zIndex: 10,
+          ...style,
+        }}
+      >
+        {isOpen ? '▶ STAGE OPEN' : '◼ STAGE CLOSE'}
+      </div>
+    );
+  }
+
   return (
     <div draggable="true"
       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
       onClick={onClick} style={{
-        margin: '0 2px',
-        position: 'relative',
-        background: `repeating-linear-gradient(45deg, ${bgColor}, ${bgColor} 4px, ${stripeColor}25 4px, ${stripeColor}25 8px)`,
-        border: `1px dashed ${color}60`, borderRadius: '3px', padding: '3px 6px',
+        margin: '0 5px', position: 'relative',
+        height: '9px', borderRadius: '3px',
+        background: `repeating-linear-gradient(45deg,#F0EEE5,#F0EEE5 4px,#E8E5DB 4px,#E8E5DB 8px)`,
+        display: 'flex', alignItems: 'center',
         cursor: 'grab', overflow: 'hidden', boxSizing: 'border-box', zIndex: 10,
-        display: 'flex', flexDirection: 'column', justifyContent: 'center',
         ...style,
       }}
     >
-      <div style={{ fontSize: '10px', fontWeight: 'bold', color, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.9, lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-        {timeLabel && <span style={{ color: `${color}99` }}>{timeLabel} · </span>}{session.title}
-      </div>
+      <span style={{ fontFamily: BV.mono, fontSize: '7px', color: BV.inkFaint, paddingLeft: '5px', letterSpacing: '0.4px', whiteSpace: 'nowrap' }}>
+        {timeLabel && `${timeLabel} `}{session.title.toLowerCase()}
+      </span>
     </div>
   );
 }
@@ -769,18 +949,18 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
           <div key={mins}
             onClick={() => isOpen && openNewSession(stage.id, mins)}
             onDragOver={isOpen ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } : undefined}
-            onDragEnter={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = 'rgb(18,18,18)'; } : undefined}
-            onDragLeave={isOpen ? e => { e.currentTarget.style.background = isOpen ? 'rgb(10,10,10)' : 'rgb(5,5,5)'; } : undefined}
-            onDrop={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = 'rgb(10,10,10)'; handleDrop(stage.id, mins, colIndex); } : undefined}
+            onDragEnter={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = '#EEEBE2'; } : undefined}
+            onDragLeave={isOpen ? e => { e.currentTarget.style.background = BV.paper; } : undefined}
+            onDrop={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = BV.paper; handleDrop(stage.id, mins, colIndex); } : undefined}
             style={{
               position: 'absolute', left: 0, right: 0,
               top: `${(mins - gridStart) / 5 * SLOT_HEIGHT}px`,
               height: `${SLOT_HEIGHT}px`,
-              background: isErr ? '#3a0a0a' : isClosed ? 'rgb(5,5,5)' : 'rgb(10,10,10)',
-              borderBottom: mins % 60 === 0 ? '1px solid rgb(18,18,18)' : mins % 30 === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none',
-              borderRight: isLastCol ? '1px solid rgba(255,255,255,0.06)' : '1px dashed rgba(255,255,255,0.03)',
+              background: isErr ? '#FEE2E2' : BV.paper,
+              borderBottom: mins % 60 === 0 ? `1px solid ${BV.paperLine}` : mins % 30 === 0 ? `1px solid ${BV.paperLineSoft}` : 'none',
+              borderRight: isLastCol ? `1px solid ${BV.paperLine}` : `1px solid ${BV.paperLineSoft}`,
               cursor: isOpen ? 'cell' : 'default',
-              outline: isErr ? '1px solid #f87171' : 'none',
+              outline: isErr ? `1px solid ${BV.clash}` : 'none',
             }}
           />
         );
@@ -791,12 +971,13 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
         <div style={{
           position: 'absolute', left: 0, right: 0, top: 0,
           height: `${(openFrom - gridStart) / 5 * SLOT_HEIGHT}px`,
-          background: 'repeating-linear-gradient(45deg, #111111 0px, #111111 6px, #0e0e0e 6px, #0e0e0e 12px)',
+          background: `repeating-linear-gradient(45deg, transparent, transparent 9px, #EFEDE4 9px, #EFEDE4 10px)`,
+          backgroundColor: BV.paper,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden', borderBottom: '1px solid #333333', zIndex: 5,
-          borderRight: isLastCol ? '1px solid rgba(255,255,255,0.06)' : '1px dashed rgba(255,255,255,0.03)',
+          overflow: 'hidden', borderBottom: `1px solid ${BV.paperLine}`, zIndex: 5,
+          borderRight: isLastCol ? `1px solid ${BV.paperLine}` : `1px solid ${BV.paperLineSoft}`,
         }}>
-          <span style={{ fontSize: '11px', color: '#444444', letterSpacing: '0.2em', fontWeight: 'bold', textTransform: 'uppercase', writingMode: 'vertical-rl', whiteSpace: 'nowrap' }}>STAGE CLOSED</span>
+          <span style={{ fontSize: '10px', color: BV.inkFaint, letterSpacing: '0.2em', fontWeight: 'bold', textTransform: 'uppercase', writingMode: 'vertical-rl', whiteSpace: 'nowrap', opacity: 0.5 }}>CLOSED</span>
         </div>
       )}
       {openUntil < gridEnd && (
@@ -804,12 +985,13 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
           position: 'absolute', left: 0, right: 0,
           top: `${(openUntil - gridStart) / 5 * SLOT_HEIGHT}px`,
           height: `${(gridEnd - openUntil) / 5 * SLOT_HEIGHT}px`,
-          background: 'repeating-linear-gradient(45deg, #111111 0px, #111111 6px, #0e0e0e 6px, #0e0e0e 12px)',
+          background: `repeating-linear-gradient(45deg, transparent, transparent 9px, #EFEDE4 9px, #EFEDE4 10px)`,
+          backgroundColor: BV.paper,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden', borderTop: '1px solid #333333', zIndex: 5,
-          borderRight: isLastCol ? '1px solid rgba(255,255,255,0.06)' : '1px dashed rgba(255,255,255,0.03)',
+          overflow: 'hidden', borderTop: `1px solid ${BV.paperLine}`, zIndex: 5,
+          borderRight: isLastCol ? `1px solid ${BV.paperLine}` : `1px solid ${BV.paperLineSoft}`,
         }}>
-          <span style={{ fontSize: '11px', color: '#444444', letterSpacing: '0.2em', fontWeight: 'bold', textTransform: 'uppercase', writingMode: 'vertical-rl', whiteSpace: 'nowrap' }}>STAGE CLOSED</span>
+          <span style={{ fontSize: '10px', color: BV.inkFaint, letterSpacing: '0.2em', fontWeight: 'bold', textTransform: 'uppercase', writingMode: 'vertical-rl', whiteSpace: 'nowrap', opacity: 0.5 }}>CLOSED</span>
         </div>
       )}
 
@@ -850,13 +1032,13 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
   const RT_CARD_WIDTH = 240;
 
   return (
-    <div style={{ borderTop: `2px solid ${stage.color}`, background: 'rgb(8,8,8)', padding: '16px 0' }}>
+    <div style={{ borderTop: `2px solid ${stage.color}`, background: '#fff', padding: '16px 0' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '0 24px', marginBottom: '16px' }}>
         <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: stage.color, flexShrink: 0 }} />
         <div>
-          <div style={{ fontSize: '13px', fontWeight: 'bold', color: stage.color, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{stage.name}</div>
-          <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)' }}>4 time blocks · {maxCols} parallel slots each</div>
+          <div style={{ fontSize: '13px', fontWeight: 'bold', color: stage.color, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: BV.sans }}>{stage.name}</div>
+          <div style={{ fontSize: '10px', color: BV.inkFaint }}>4 time blocks · {maxCols} parallel slots each</div>
         </div>
       </div>
 
@@ -872,7 +1054,7 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
           <div key={blockIdx} style={{ padding: '8px 24px', marginBottom: '12px' }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginBottom: '8px' }}>
               <span style={{ fontSize: '11px', fontWeight: 'bold', color: stage.color, letterSpacing: '0.08em' }}>{block.label}</span>
-              <span style={{ fontSize: '11px', color: 'rgba(240,240,240,0.3)', fontFamily: 'monospace', letterSpacing: '0.05em' }}>
+              <span style={{ fontSize: '11px', color: BV.inkFaint, fontFamily: BV.mono, letterSpacing: '0.05em' }}>
                 {formatTime24(block.start)}–{formatTime24(block.end)} · {blockDuration}m
               </span>
             </div>
@@ -904,31 +1086,37 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                       </div>
                     );
                   }
-                  const rtMetaColor = session.status === 'confirmed' ? 'rgba(240,240,240,0.7)' : 'rgba(240,240,240,0.4)';
-                  const rtLeftAccent = session.status === 'confirmed' ? '#3568FF' : topicColor;
+                  const spineColor = TYPE_SPINE[session.format] || BV.inkFaint;
+                  const isPlaceholderRT = session.status === 'placeholder';
+                  const isPencilledRT = session.status === 'pencilled';
+                  const rtBorderColor = isPlaceholderRT ? BV.paperLine : isPencilledRT ? '#d97706' : BV.cardBorder;
+                  const rtBorderStyle = isPlaceholderRT ? 'dashed' : 'solid';
                   return (
                     <div key={colIdx} draggable="true"
                       onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(session); }}
                       onClick={() => onEditSession(session)}
                       style={{
-                        width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '4px', cursor: 'grab',
-                        background: statusDef.color,
-                        borderTop: `1px solid ${statusDef.border}`,
-                        borderRight: `1px solid ${statusDef.border}`,
-                        borderBottom: `1px solid ${statusDef.border}`,
-                        borderLeft: `3px solid ${rtLeftAccent}`,
-                        transition: 'opacity 0.15s',
+                        width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '7px', cursor: 'grab',
+                        background: isPlaceholderRT ? `repeating-linear-gradient(45deg,${BV.card},${BV.card} 7px,#F4F2EA 7px,#F4F2EA 14px)` : BV.card,
+                        border: `1px ${rtBorderStyle} ${rtBorderColor}`,
+                        borderLeft: `4px solid ${spineColor}`,
+                        boxShadow: BV.cardShadow,
+                        transition: 'box-shadow .12s, transform .06s',
                       }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
-                      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                      onMouseEnter={e => { e.currentTarget.style.boxShadow = BV.cardHoverShadow; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.boxShadow = BV.cardShadow; e.currentTarget.style.transform = 'none'; }}
                     >
-                      <div style={{ fontSize: '13px', fontWeight: 'bold', color: statusDef.textColor, textTransform: 'uppercase', lineHeight: 1.3, marginBottom: '4px', letterSpacing: '0.04em' }}>{session.title}</div>
-                      {session.format && <div style={{ marginBottom: '3px' }}><span style={{ fontSize: '11px', padding: '1px 6px', borderRadius: '2px', background: rtLeftAccent + '18', color: rtMetaColor }}>{session.format}</span></div>}
-                      {sessionSpeakers.length > 0 && <div style={{ fontSize: '12px', color: rtMetaColor, lineHeight: 1.3 }}>{sessionSpeakers.map(s => {
-                        const role = getSpeakerRole(session.speakers, s.id);
-                        return role === 'moderator' ? `[MOD] ${s.name}` : s.name;
-                      }).join(', ')}</div>}
-                      {session.capacity && <div style={{ fontSize: '9px', color: '#f59e0b', marginTop: '2px' }}>Cap: {session.capacity}</div>}
+                      <div style={{ fontSize: '12.5px', fontWeight: 650, color: isPlaceholderRT ? BV.inkSoft : BV.ink, lineHeight: 1.3, marginBottom: '4px', letterSpacing: '-0.15px' }}>{session.title}</div>
+                      {session.format && <div style={{ marginBottom: '3px' }}><span style={{ fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.6px', textTransform: 'uppercase', padding: '1.5px 5px', borderRadius: '3px', fontWeight: 600, background: TYPE_TAG_BG[session.format] || BV.paperLineSoft, color: spineColor }}>{session.format}</span></div>}
+                      {(() => { const seats = getSeatDisplay(sessionSpeakers, session.speakers, speakers); return seats.length > 0 && (
+                        <div style={{ fontSize: '10.5px', color: BV.inkSoft, lineHeight: 1.3 }}>
+                          {seats.map((s, i) => <span key={i} style={{
+                            ...(s.provisional ? { opacity: 0.6, fontStyle: 'italic' } : {}),
+                            ...(s.kind !== 'speaker' ? { fontStyle: 'italic' } : {}),
+                          }}>{i > 0 ? ', ' : ''}{s.text}</span>)}
+                        </div>
+                      ); })()}
+                      {session.capacity && <div style={{ fontFamily: BV.mono, fontSize: '9px', color: BV.inkFaint, marginTop: '2px' }}>Cap: {session.capacity}</div>}
                       {session.topics?.[0] && <div style={{ fontSize: '9px', color: topicColor, marginTop: '2px', opacity: 0.8 }}>{session.topics[0]}{session.topics[1] ? `, ${session.topics[1]}` : ''}</div>}
                     </div>
                   );
@@ -937,18 +1125,18 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                 return (
                   <div key={colIdx}
                     onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                    onDragEnter={e => { e.preventDefault(); e.currentTarget.style.borderColor = stage.color; e.currentTarget.style.background = 'rgb(18,18,18)'; }}
-                    onDragLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = 'transparent'; }}
-                    onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'; e.currentTarget.style.background = 'transparent'; handleDrop(stage.id, block.start, colIdx); }}
+                    onDragEnter={e => { e.preventDefault(); e.currentTarget.style.borderColor = stage.color; e.currentTarget.style.background = BV.paperLineSoft; }}
+                    onDragLeave={e => { e.currentTarget.style.borderColor = BV.paperLine; e.currentTarget.style.background = 'transparent'; }}
+                    onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = BV.paperLine; e.currentTarget.style.background = 'transparent'; handleDrop(stage.id, block.start, colIdx); }}
                     onClick={() => openNewSession(stage.id, block.start)}
                     style={{
                       width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '4px',
-                      border: '1px dashed rgba(255,255,255,0.06)', cursor: 'cell',
+                      border: `1px dashed ${BV.paperLine}`, cursor: 'cell',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       minHeight: '48px', transition: 'all 0.15s',
                     }}
                   >
-                    <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.08)', letterSpacing: '0.05em' }}>Slot {colIdx + 1}</span>
+                    <span style={{ fontSize: '10px', color: BV.inkFaint, letterSpacing: '0.05em', opacity: 0.4 }}>Slot {colIdx + 1}</span>
                   </div>
                 );
               })}
@@ -1310,8 +1498,8 @@ function EveningEventsSection({ sessions, selectedDay, onEdit }) {
   });
 
   return (
-    <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', padding: '20px 24px' }}>
-      <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '14px' }}>
+    <div style={{ borderTop: `1px solid ${BV.paperLine}`, padding: '20px 24px', background: '#fff' }}>
+      <div style={{ fontFamily: BV.mono, fontSize: '10px', color: BV.inkFaint, letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '14px' }}>
         Evening Events
       </div>
       <div style={{ display: 'flex', gap: '12px', overflowX: 'auto', paddingBottom: '8px' }}>
@@ -1321,18 +1509,18 @@ function EveningEventsSection({ sessions, selectedDay, onEdit }) {
           const timeLabel = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(endMins)}` : '';
           return (
             <div key={s.id} onClick={() => onEdit(s)} style={{
-              background: 'rgb(13,13,13)', border: '1px solid rgba(255,255,255,0.06)',
+              background: BV.card, border: `1px solid ${BV.cardBorder}`,
               borderRadius: '8px', padding: '14px 18px', cursor: 'pointer',
               minWidth: '240px', maxWidth: '300px', flexShrink: 0,
-              transition: 'border-color 0.15s',
+              boxShadow: BV.cardShadow, transition: 'box-shadow .15s, transform .06s',
             }}
-              onMouseEnter={e => e.currentTarget.style.borderColor = '#3568FF'}
-              onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = BV.cardHoverShadow; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = BV.cardShadow; e.currentTarget.style.transform = 'none'; }}
             >
-              {timeLabel && <div style={{ fontSize: '11px', color: '#3568FF', fontFamily: 'monospace', marginBottom: '6px' }}>{timeLabel}</div>}
-              <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'rgb(240,240,240)', marginBottom: '4px' }}>{s.title}</div>
-              <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)' }}>
-                {s.venue && <span>{'\uD83D\uDCCD'} {s.venue}</span>}
+              {timeLabel && <div style={{ fontFamily: BV.mono, fontSize: '11px', color: '#2563EB', marginBottom: '6px' }}>{timeLabel}</div>}
+              <div style={{ fontSize: '13px', fontWeight: 'bold', color: BV.ink, marginBottom: '4px' }}>{s.title}</div>
+              <div style={{ fontSize: '11px', color: BV.inkSoft }}>
+                {s.venue && <span>{s.venue}</span>}
                 {s.venue && s.host && <span> · </span>}
                 {s.host && <span>{s.host}</span>}
               </div>
@@ -1347,6 +1535,62 @@ function EveningEventsSection({ sessions, selectedDay, onEdit }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ── Capacity Rail ────────────────────────────────────────────────────────────
+function CapacityRail({ stages, daySessions, selectedDay }) {
+  const mainStages = stages.filter(s => (s.max_columns || 1) === 1);
+  if (mainStages.length === 0) return null;
+
+  const caps = mainStages.map(stage => {
+    const openFrom = parseTime(stage.open_from);
+    const openUntil = parseTime(stage.open_until);
+    const windowMins = openUntil - openFrom;
+    const stageSessions = daySessions.filter(s => s.stage_id === stage.id && s.start_time && s.type !== 'block');
+    const usedMins = stageSessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+    const pct = windowMins > 0 ? Math.round((usedMins / windowMins) * 100) : 0;
+    const slotsLeft = windowMins > 0 ? Math.floor((windowMins - usedMins) / 30) : 0;
+    return { stage, pct: Math.min(pct, 100), slotsLeft: Math.max(slotsLeft, 0) };
+  });
+
+  return (
+    <div style={{
+      background: '#fff', borderBottom: `1px solid ${BV.paperLine}`,
+      display: 'flex', alignItems: 'center', gap: '28px', padding: '9px 20px',
+      position: 'sticky', top: '52px', zIndex: 40, overflowX: 'auto', flexShrink: 0,
+    }}>
+      <span style={{ fontFamily: BV.mono, fontSize: '10px', letterSpacing: '1px', color: BV.inkFaint, whiteSpace: 'nowrap' }}>
+        CAPACITY · {DAYS.find(d => d.id === selectedDay)?.label?.toUpperCase()}
+      </span>
+      {caps.map(({ stage, pct, slotsLeft }) => {
+        const fillColor = pct > 90 ? BV.clash : pct >= 70 ? '#C2410C' : BV.open;
+        const tier = pct > 90 ? 'full' : pct >= 70 ? 'tight' : '';
+        return (
+          <div key={stage.id} style={{ display: 'flex', alignItems: 'center', gap: '9px', whiteSpace: 'nowrap' }}>
+            <span style={{ fontSize: '12px', fontWeight: 600, width: '118px', textAlign: 'right', color: BV.ink }}>{stage.name}</span>
+            <div style={{ width: '150px', height: '9px', background: BV.paperLine, borderRadius: '5px', overflow: 'hidden', position: 'relative' }}>
+              <div style={{ height: '100%', borderRadius: '5px', width: `${pct}%`, background: fillColor }} />
+            </div>
+            <span style={{
+              fontFamily: BV.mono, fontSize: '11px', width: '80px',
+              color: tier === 'full' ? BV.clash : tier === 'tight' ? '#C2410C' : BV.inkSoft,
+              fontWeight: tier ? 700 : 400,
+            }}>
+              {pct}% · {slotsLeft} slot{slotsLeft !== 1 ? 's' : ''}
+            </span>
+          </div>
+        );
+      })}
+      <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginLeft: 'auto' }}>
+        {['Keynote', 'Panel', 'Podcast', 'Workshop'].map(t => (
+          <span key={t} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '10px', color: BV.inkSoft }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '3px', display: 'inline-block', background: TYPE_SPINE[t] }} />
+            {t}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -1513,13 +1757,20 @@ export default function NerdConPlanner() {
         const aStart = isoToMinutes(a.start_time), aEnd = aStart + a.duration_minutes;
         const bStart = isoToMinutes(b.start_time), bEnd = bStart + b.duration_minutes;
         if (!(aStart < bEnd && bStart < aEnd)) continue;
-        const shared = getSpeakerIds(a.speakers).filter(id => getSpeakerIds(b.speakers).includes(id));
-        if (shared.length) {
-          (clashMap[a.id] ||= new Set()); (clashMap[b.id] ||= new Set());
-          shared.forEach(id => {
-            const name = speakers.find(sp => sp.id === id)?.name || 'Speaker';
-            clashMap[a.id].add(name); clashMap[b.id].add(name);
-          });
+        const aNorm = normalizeSpeakers(a.speakers);
+        const bNorm = normalizeSpeakers(b.speakers);
+        const aRealIds = aNorm.filter(s => s.kind === 'speaker' && s.speaker_id).map(s => ({ id: s.speaker_id, status: s.status || 'confirmed' }));
+        const bRealIds = bNorm.filter(s => s.kind === 'speaker' && s.speaker_id).map(s => ({ id: s.speaker_id, status: s.status || 'confirmed' }));
+        for (const aEntry of aRealIds) {
+          const bEntry = bRealIds.find(e => e.id === aEntry.id);
+          if (!bEntry) continue;
+          const tier = (aEntry.status === 'confirmed' && bEntry.status === 'confirmed') ? 'hard' : 'soft';
+          const name = speakers.find(sp => sp.id === aEntry.id)?.name || 'Speaker';
+          for (const sid of [a.id, b.id]) {
+            if (!clashMap[sid]) clashMap[sid] = { names: new Set(), tier: 'soft' };
+            clashMap[sid].names.add(name);
+            if (tier === 'hard') clashMap[sid].tier = 'hard';
+          }
         }
       }
     }
@@ -1544,45 +1795,51 @@ export default function NerdConPlanner() {
   const onEditSession = (s) => { setEditingSession(s); setShowModal(true); };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'rgb(5,5,5)', color: 'rgb(240,240,240)', fontFamily: "'JetBrains Mono', ui-monospace, monospace", overflow: 'hidden' }}>
-      {/* Top Bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 24px', height: '52px', borderBottom: '1px solid rgba(255,255,255,0.06)', background: 'rgb(8,8,8)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: 'rgb(240,240,240)', fontFamily: "'Press Start 2P', cursive" }}>FINTECH</span>
-          <span style={{ fontSize: '13px', fontWeight: 400, letterSpacing: '0.1em', color: 'rgb(240,240,240)', fontFamily: "'Press Start 2P', cursive" }}>NERDCON</span>
-          <span style={{ fontSize: '10px', color: 'rgba(240,240,240,0.55)', letterSpacing: '0.1em' }}>SAN DIEGO · NOV 18–20 · OPS</span>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: BV.paper, color: BV.ink, fontFamily: BV.sans, overflow: 'hidden' }}>
+      {/* Top Bar — dark cockpit */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '0 20px', height: '60px', borderBottom: `1px solid ${BV.cockpitLine}`, background: BV.cockpit, flexShrink: 0 }}>
+        <div style={{ fontFamily: BV.mono, fontWeight: 700, letterSpacing: '1px', fontSize: '15px', whiteSpace: 'nowrap', color: '#fff' }}>
+          FINTECH NERDCON<span style={{ color: TYPE_SPINE.Keynote }}>.</span>
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ fontFamily: BV.mono, fontSize: '10px', lineHeight: 1.4, color: '#8A8D96', letterSpacing: '0.5px' }}>
+          SAN DIEGO<br />NOV 18–20 · OPS
+        </div>
+        <div style={{ display: 'flex', gap: '6px' }}>
           {DAYS.map(day => (
             <button key={day.id} onClick={() => setSelectedDay(day.id)} style={{
-              padding: '6px 20px', borderRadius: '8px', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', letterSpacing: '0.05em',
-              background: selectedDay === day.id ? '#3568FF' : 'transparent',
-              border: `1px solid ${selectedDay === day.id ? '#3568FF' : 'rgba(255,255,255,0.18)'}`,
-              color: selectedDay === day.id ? '#fff' : 'rgba(240,240,240,0.75)',
-              fontWeight: selectedDay === day.id ? 'bold' : 'normal', transition: 'all 0.15s'
-            }}>{day.label} · {day.date}</button>
+              padding: '7px 14px', borderRadius: '7px', cursor: 'pointer', fontFamily: BV.mono,
+              fontSize: '11px', lineHeight: 1.3, textAlign: 'left', transition: '.12s',
+              background: selectedDay === day.id ? '#2563EB' : 'transparent',
+              border: `1px solid ${selectedDay === day.id ? '#2563EB' : BV.cockpitLine}`,
+              color: selectedDay === day.id ? '#fff' : '#B7BAC2',
+            }}><b style={{ display: 'block', fontSize: '12px' }}>{day.label}</b>{day.date}</button>
           ))}
         </div>
-        <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '18px', marginLeft: '4px' }}>
           {[
-            { label: 'CONFIRMED', value: confirmedCount, color: '#3568FF' },
-            { label: 'SCHEDULED', value: totalScheduled, color: 'rgb(240,240,240)' },
-            { label: 'OVERLAPS', value: clashes, color: clashes > 0 ? '#f87171' : 'rgba(240,240,240,0.45)' },
-            { label: 'SPK CLASH', value: speakerClashCount, color: speakerClashCount > 0 ? '#ef4444' : 'rgba(240,240,240,0.45)' },
+            { label: 'CONFIRMED', value: confirmedCount, color: '#60A5FA' },
+            { label: 'SCHEDULED', value: totalScheduled, color: '#fff' },
+            { label: 'CLASHES', value: clashes + speakerClashCount, color: (clashes + speakerClashCount) > 0 ? BV.clash : '#8A8D96' },
           ].map(stat => (
-            <div key={stat.label} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '18px', fontWeight: 'bold', color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-              <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.55)', letterSpacing: '0.1em', marginTop: '2px' }}>{stat.label}</div>
+            <div key={stat.label} style={{ textAlign: 'center', fontFamily: BV.mono }}>
+              <div style={{ fontSize: '18px', fontWeight: 700, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+              <div style={{ fontSize: '8.5px', letterSpacing: '1px', color: '#8A8D96', marginTop: '3px' }}>{stat.label}</div>
             </div>
           ))}
-          <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#3568FF', border: 'none', borderRadius: '8px', padding: '0 16px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold', letterSpacing: '0.05em', height: '32px' }}>+ NEW</button>
-          <button onClick={() => setShowSpeakersModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.85)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px', letterSpacing: '0.05em', gap: '6px' }} title="Manage Speakers"><span style={{ fontSize: '14px' }}>{'\uD83C\uDFA4'}</span>SPEAKERS</button>
-          <button onClick={() => setShowRegistrations(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.85)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px', letterSpacing: '0.05em', gap: '6px' }} title="Registrations"><span style={{ fontSize: '14px' }}>{'\u{1F465}'}</span>SIGNUPS</button>
-          <button onClick={() => setShowStagesModal(true)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '0 12px', color: 'rgba(240,240,240,0.85)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', display: 'flex', alignItems: 'center', height: '32px', letterSpacing: '0.05em', gap: '6px' }} title="Manage Stages"><span style={{ fontSize: '14px' }}>{'⚙'}</span>STAGES</button>
-          <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'none', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '8px', padding: '0 16px', color: 'rgba(240,240,240,0.95)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit', letterSpacing: '0.05em', textDecoration: 'none', display: 'flex', alignItems: 'center', height: '32px', fontWeight: 'bold' }}>VIEW &#8599;</a>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button onClick={() => setShowSpeakersModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>SPEAKERS</button>
+          <button onClick={() => setShowRegistrations(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>SIGNUPS</button>
+          <button onClick={() => setShowStagesModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>STAGES</button>
+          <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#2563EB', border: '1px solid #2563EB', color: '#fff', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', fontWeight: 600, display: 'flex', gap: '6px', alignItems: 'center' }}>+ NEW SESSION</button>
+          <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', textDecoration: 'none', display: 'flex', gap: '6px', alignItems: 'center' }}>VIEW</a>
         </div>
       </div>
 
+      {/* Capacity Rail */}
+      <CapacityRail stages={stages} daySessions={daySessions} selectedDay={selectedDay} />
+
+      {/* Content: Sidebar + Grid */}
       {/* Content: Sidebar + Grid */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {selectedDay !== 'day0' && (
@@ -1599,30 +1856,44 @@ export default function NerdConPlanner() {
             <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: '100%' }}>
 
               {/* ── Sticky header row (hall names + stage names) ── */}
-              <div style={{ position: 'sticky', top: 0, zIndex: 30, display: 'flex', background: 'rgb(8,8,8)' }}>
+              <div style={{ position: 'sticky', top: 0, zIndex: 30, display: 'flex', background: '#fff' }}>
                 {/* Corner cell — sticky in both directions */}
-                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 31, background: 'rgb(8,8,8)' }}>
-                  <div style={{ height: '52px', borderBottom: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)' }} />
-                  <div style={{ height: '44px', borderBottom: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)' }} />
+                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 31, background: BV.paper }}>
+                  <div style={{ height: '30px', borderBottom: `1px solid ${BV.paperLine}`, borderRight: `1px solid ${BV.paperLine}` }} />
+                  <div style={{ height: '44px', borderBottom: `1px solid ${BV.paperLine}`, borderRight: `1px solid ${BV.paperLine}` }} />
                 </div>
                 {halls.map(hall => {
                   const hallWidth = hall.stages.reduce((sum, s) => sum + STAGE_COL_WIDTH * (s.max_columns || 1), 0);
                   return (
                     <div key={hall.id} style={{ flexShrink: 0 }}>
                       <div style={{
-                        height: '52px', background: 'rgb(8,8,8)', borderBottom: '1px solid rgba(255,255,255,0.06)', borderRight: '1px solid rgba(255,255,255,0.06)',
+                        height: '30px', background: '#fff', borderBottom: `1px solid ${BV.paperLine}`,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         width: `${hallWidth}px`,
                       }}>
-                        <span style={{ fontSize: '11px', color: 'rgba(240,240,240,0.3)', letterSpacing: '0.15em', fontWeight: 'bold' }}>{hall.name.toUpperCase()}</span>
+                        <span style={{ fontFamily: BV.mono, fontSize: '10px', color: BV.inkFaint, letterSpacing: '2px' }}>{hall.name.toUpperCase()}</span>
                       </div>
                       <div style={{ display: 'flex' }}>
                         {hall.stages.map(stage => {
                           const maxCols = stage.max_columns || 1;
+                          const isClosed = false;
+                          const openFrom = parseTime(stage.open_from);
+                          const openUntil = parseTime(stage.open_until);
+                          const windowMins = openUntil - openFrom;
+                          const stSessions = daySessions.filter(s => s.stage_id === stage.id && s.start_time && s.type !== 'block');
+                          const usedMins = stSessions.reduce((sum, s) => sum + (s.duration_minutes || 0), 0);
+                          const occPct = windowMins > 0 ? Math.round((usedMins / windowMins) * 100) : 0;
+                          const occColor = occPct > 90 ? BV.clash : occPct >= 70 ? '#C2410C' : BV.open;
                           return (
-                            <div key={stage.id} style={{ width: `${STAGE_COL_WIDTH * maxCols}px`, height: '44px', padding: '0 8px', borderBottom: '1px solid rgba(255,255,255,0.1)', borderRight: '1px solid rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', background: 'rgba(255,255,255,0.08)', boxSizing: 'border-box' }}>
-                              <div style={{ fontSize: '11px', color: 'rgb(240,240,240)', fontWeight: 'bold', letterSpacing: '0.05em' }}>{stage.name}</div>
-                              <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.2)' }}>{stage.open_from}–{stage.open_until}{maxCols > 1 ? ` · ${maxCols}col` : ''}</div>
+                            <div key={stage.id} style={{
+                              width: `${STAGE_COL_WIDTH * maxCols}px`, padding: '10px 12px',
+                              borderBottom: `1px solid ${BV.paperLine}`, borderLeft: `1px solid ${BV.paperLineSoft}`,
+                              background: isClosed ? `repeating-linear-gradient(45deg,#FBFAF6,#FBFAF6 6px,#F2F0E8 6px,#F2F0E8 12px)` : '#fff',
+                              boxSizing: 'border-box',
+                            }}>
+                              <div style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '-0.1px', color: BV.ink }}>{stage.name}</div>
+                              <div style={{ fontFamily: BV.mono, fontSize: '10px', color: BV.inkFaint, marginTop: '2px' }}>{stage.open_from}–{stage.open_until}{maxCols > 1 ? ` · ${maxCols}col` : ''}</div>
+                              {maxCols === 1 && <div style={{ fontFamily: BV.mono, fontSize: '9px', color: occColor, marginTop: '3px', letterSpacing: '0.5px' }}>● {occPct}% full</div>}
                             </div>
                           );
                         })}
@@ -1634,11 +1905,11 @@ export default function NerdConPlanner() {
 
               {/* ── Body (time column + slot columns) ── */}
               <div style={{ display: 'flex' }}>
-                {/* Time column — sticky left */}
-                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 15, background: 'rgb(18,18,18)' }}>
+                {/* Time column — sticky left, light paper */}
+                <div style={{ width: `${TIME_COL_WIDTH}px`, flexShrink: 0, position: 'sticky', left: 0, zIndex: 15, background: BV.paper }}>
                   {TIME_SLOTS.map(mins => (
-                    <div key={mins} style={{ height: `${SLOT_HEIGHT}px`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', borderBottom: mins % 60 === 0 ? '1px solid rgba(255,255,255,0.06)' : mins % 30 === 0 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-                      {mins % 30 === 0 && <span style={{ fontSize: '12px', color: mins % 60 === 0 ? 'rgba(240,240,240,0.5)' : 'rgba(240,240,240,0.2)', fontFamily: 'monospace' }}>{formatTime(mins)}</span>}
+                    <div key={mins} style={{ height: `${SLOT_HEIGHT}px`, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '8px', borderRight: `1px solid ${BV.paperLine}`, borderBottom: mins % 60 === 0 ? `1px solid ${BV.paperLine}` : mins % 30 === 0 ? `1px solid ${BV.paperLineSoft}` : 'none' }}>
+                      {mins % 30 === 0 && <span style={{ fontFamily: BV.mono, fontSize: '10px', color: mins % 60 === 0 ? BV.inkSoft : BV.inkFaint }}>{formatTime(mins)}</span>}
                     </div>
                   ))}
                 </div>

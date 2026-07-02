@@ -40,5 +40,5 @@ export const TOPIC_TAG_COLORS = {
 
 export const FORMAT_TAGS = [
   "Panel", "Keynote", "Fireside Chat", "Workshop", "Demo", "Roundtable",
-  "Podcast", "Bootcamp", "Interview", "Q&A",
+  "Podcast", "Bootcamp", "Interview", "Q&A", "Rant",
 ];
