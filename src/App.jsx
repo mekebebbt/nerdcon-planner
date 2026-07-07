@@ -875,14 +875,14 @@ function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo
       {timeLabel && <div style={{ fontFamily: BV.mono, fontSize: '9.5px', letterSpacing: '0.3px', color: BV.inkSoft, lineHeight: 1, marginBottom: dur < 20 ? '1px' : '2px' }}>{timeLabel}</div>}
       <div style={{ fontSize: dur < 20 ? '11px' : '12.5px', fontWeight: 650, letterSpacing: '-0.15px', color: titleColor, lineHeight: 1.18, marginBottom: '2px', whiteSpace: dur < 20 ? 'nowrap' : undefined, overflow: dur < 20 ? 'hidden' : undefined, textOverflow: dur < 20 ? 'ellipsis' : undefined }}>{session.title}</div>
       {(() => { const seats = getSeatDisplay(sessionSpeakers, session.speakers, speakers); return seats.length > 0 && (
-        <div style={{ fontSize: '10.5px', color: BV.inkSoft, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {seats.slice(0, 3).map((s, i) => <span key={i} style={{
+        <div style={{ fontSize: '10.5px', color: BV.inkSoft, lineHeight: 1.35 }}>
+          {seats.map((s, i) => <span key={i} style={{
             ...(s.provisional ? { opacity: 0.6, fontStyle: 'italic' } : {}),
             ...(s.kind !== 'speaker' ? { fontStyle: 'italic' } : {}),
-          }}>{i > 0 ? ', ' : ''}{s.text}</span>)}{seats.length > 3 ? ` +${seats.length - 3}` : ''}
+          }}>{i > 0 ? ', ' : ''}{s.text}</span>)}
         </div>
       ); })()}
-      {dur >= 20 && session.format && <div style={{ marginTop: '5px' }}><span style={{ fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.6px', textTransform: 'uppercase', padding: '1.5px 5px', borderRadius: '3px', fontWeight: 600, background: tagBg, color: spineColor }}>{session.format}</span></div>}
+      {dur >= 20 && session.format && <div style={{ marginTop: '4px' }}><span style={{ fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.6px', textTransform: 'uppercase', padding: '1.5px 5px', borderRadius: '3px', fontWeight: 600, background: tagBg, color: spineColor }}>{session.format}</span></div>}
     </div>
   );
 }
