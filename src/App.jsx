@@ -126,7 +126,7 @@ const getSeatDisplay = (sessionSpeakers, speakersArr, allSpeakers) => {
   return seats;
 };
 
-function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded, clashInfo, isIgnored, onToggleIgnore, readOnly, onCommentsChange }) {
+function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded, clashInfo, isIgnored, onToggleIgnore, readOnly, onCommentsChange, prefillStageId, prefillTimeMins }) {
   const { user: authUser, profile, role } = useContext(AuthContext);
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('placeholder');
@@ -197,13 +197,16 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       if (editingSession.start_time) setStartTime(formatTime24(isoToMinutes(editingSession.start_time)));
     } else {
       setTitle(''); setStatus('placeholder'); setFormat('Panel');
-      setDuration(30); setStartTime('09:00'); setSelectedSpeakers([]); setSpeakerSearch('');
+      setDuration(30);
+      setStartTime(prefillTimeMins != null ? formatTime24(prefillTimeMins) : '09:00');
+      setSelectedSpeakers([]); setSpeakerSearch('');
       setCompanyInput(''); setGuestInput(''); setShowAddPlaceholder(false);
-      setTopics([]); setNotes(''); setDescription(''); setStageId(stages[0]?.id || '');
+      setTopics([]); setNotes(''); setDescription('');
+      setStageId(prefillStageId || stages[0]?.id || '');
       setCapacity(''); setVenue(''); setHost(''); setInviteOnly(false);
       setComments([]); setCommentText('');
     }
-  }, [editingSession, isOpen, stages]);
+  }, [editingSession, isOpen, stages, prefillStageId, prefillTimeMins]);
 
   const handlePostComment = async () => {
     if (!commentText.trim() || !editingSession?.id || postingComment) return;
@@ -1034,6 +1037,8 @@ function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo
   const tagBg = TYPE_TAG_BG[session.format] || BV.paperLineSoft;
   const hasActiveClash = clashInfo && !isClashIgnored;
   const [showClashTooltip, setShowClashTooltip] = useState(false);
+  const mouseDownPos = useRef(null);
+  const didDrag = useRef(false);
 
   const isPlaceholder = session.status === 'placeholder';
   const isPencilled = session.status === 'pencilled';
@@ -1046,8 +1051,10 @@ function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo
 
   return (
     <div draggable={isEditor ? "true" : "false"}
-      onDragStart={isEditor ? (e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
-      onClick={onClick} style={{
+      onDragStart={isEditor ? (e) => { didDrag.current = true; e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
+      onMouseDown={(e) => { mouseDownPos.current = { x: e.clientX, y: e.clientY }; didDrag.current = false; }}
+      onClick={(e) => { if (didDrag.current) { didDrag.current = false; return; } if (mouseDownPos.current) { const dx = e.clientX - mouseDownPos.current.x; const dy = e.clientY - mouseDownPos.current.y; if (Math.abs(dx) + Math.abs(dy) > 5) return; } onClick(); }}
+      style={{
         margin: '0 5px',
         position: 'relative',
         background: cardBg,
@@ -1116,13 +1123,17 @@ function BlockCard({ session, onClick, style, onDragStart, isEditor }) {
   const isMarker = session.block_type === 'stage-open' || session.block_type === 'stage-close';
   const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
   const timeLabel = startMins !== null ? formatTime24(startMins) : null;
+  const mouseDownPos = useRef(null);
+  const didDrag = useRef(false);
+  const handleMouseDown = (e) => { mouseDownPos.current = { x: e.clientX, y: e.clientY }; didDrag.current = false; };
+  const handleClick = () => { if (didDrag.current) { didDrag.current = false; return; } onClick(); };
 
   if (isMarker) {
     const isOpen = session.block_type === 'stage-open';
     return (
       <div draggable={isEditor ? "true" : "false"}
-        onDragStart={isEditor ? (e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
-        onClick={onClick} style={{
+        onDragStart={isEditor ? (e) => { didDrag.current = true; e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
+        onMouseDown={handleMouseDown} onClick={handleClick} style={{
           margin: '0 5px', position: 'absolute', left: 0, right: 0,
           height: '18px', borderRadius: '4px', cursor: isEditor ? 'grab' : 'pointer',
           background: isOpen ? '#DCFCE7' : '#FEE2E2',
@@ -1139,8 +1150,8 @@ function BlockCard({ session, onClick, style, onDragStart, isEditor }) {
 
   return (
     <div draggable={isEditor ? "true" : "false"}
-      onDragStart={isEditor ? (e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
-      onClick={onClick} style={{
+      onDragStart={isEditor ? (e) => { didDrag.current = true; e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
+      onMouseDown={handleMouseDown} onClick={handleClick} style={{
         margin: '0 5px', position: 'relative',
         height: '9px', borderRadius: '3px',
         background: `repeating-linear-gradient(45deg,#F0EEE5,#F0EEE5 4px,#E8E5DB 4px,#E8E5DB 8px)`,
@@ -1161,10 +1172,30 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
   const gridStart = TIME_SLOTS[0];
   const gridEnd = TIME_SLOTS[TIME_SLOTS.length - 1] + 5;
   const totalHeight = TIME_SLOTS.length * SLOT_HEIGHT;
+  const colRef = useRef(null);
+
+  const yToMins = (clientY) => {
+    if (!colRef.current) return gridStart;
+    const rect = colRef.current.getBoundingClientRect();
+    const offsetY = clientY - rect.top;
+    const rawMins = gridStart + (offsetY / SLOT_HEIGHT) * 5;
+    return Math.round(rawMins / 5) * 5;
+  };
+
+  const handleColumnDrop = (e) => {
+    if (!isEditor) return;
+    e.preventDefault();
+    const mins = yToMins(e.clientY);
+    const clamped = Math.max(gridStart, Math.min(mins, gridEnd - 5));
+    handleDrop(stage.id, clamped, colIndex);
+  };
 
   return (
-    <div style={{ width: `${colWidth}px`, flexShrink: 0, position: 'relative', height: `${totalHeight}px` }}>
-      {/* Slot grid cells — drag/drop targets */}
+    <div ref={colRef} style={{ width: `${colWidth}px`, flexShrink: 0, position: 'relative', height: `${totalHeight}px` }}
+      onDragOver={isEditor ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } : undefined}
+      onDrop={isEditor ? handleColumnDrop : undefined}
+    >
+      {/* Slot grid cells — visual grid + click-to-add targets */}
       {TIME_SLOTS.map(mins => {
         const isOpen = mins >= openFrom && mins < openUntil;
         const isClosed = mins < openFrom || mins >= openUntil;
@@ -1172,10 +1203,6 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
         return (
           <div key={mins}
             onClick={() => isOpen && isEditor && openNewSession(stage.id, mins)}
-            onDragOver={isOpen && isEditor ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } : undefined}
-            onDragEnter={isOpen && isEditor ? e => { e.preventDefault(); e.currentTarget.style.background = '#EEEBE2'; } : undefined}
-            onDragLeave={isOpen && isEditor ? e => { e.currentTarget.style.background = BV.paper; } : undefined}
-            onDrop={isOpen && isEditor ? e => { e.preventDefault(); e.currentTarget.style.background = BV.paper; handleDrop(stage.id, mins, colIndex); } : undefined}
             style={{
               position: 'absolute', left: 0, right: 0,
               top: `${(mins - gridStart) / 5 * SLOT_HEIGHT}px`,
@@ -1967,6 +1994,8 @@ function NerdConPlanner() {
   const dragSessionRef = useRef(null);
   const [dropError, setDropError] = useState(null);
   const [pendingBlock, setPendingBlock] = useState(null);
+  const [prefillStageId, setPrefillStageId] = useState(null);
+  const [prefillTimeMins, setPrefillTimeMins] = useState(null);
   const [showRegistrations, setShowRegistrations] = useState(false);
   const [showSpeakersModal, setShowSpeakersModal] = useState(false);
   const [ignoredClashes, setIgnoredClashes] = useState(() => {
@@ -2009,7 +2038,8 @@ function NerdConPlanner() {
         duration_minutes: session.duration_minutes, speakers: session.speakers,
         topics: session.topics, notes: session.notes, description: session.description,
         stage_id: session.stage_id,
-        day: session.day, start_time: session.start_time, end_time: session.end_time,
+        day: session.day, session_date: session.session_date || (DAYS.find(d => d.id === session.day)?.full || null),
+        start_time: session.start_time, end_time: session.end_time,
         column_index: session.column_index || 0,
         type: session.type || null, block_type: session.block_type || null,
         venue: session.venue || null, host: session.host || null,
@@ -2036,6 +2066,8 @@ function NerdConPlanner() {
 
   const openNewSession = (stageId, timeMins) => {
     if (!isEditor) return;
+    setPrefillStageId(stageId || null);
+    setPrefillTimeMins(timeMins != null ? timeMins : null);
     setEditingSession(null);
     setShowModal(true);
   };
@@ -2047,6 +2079,18 @@ function NerdConPlanner() {
     dragSessionRef.current = null;
     const dayDate = DAYS.find(d => d.id === selectedDay)?.full;
     if (!dayDate) return;
+
+    // Closed-hours rejection
+    const targetStage = stages.find(st => st.id === stageId);
+    if (targetStage) {
+      const stageOpen = parseTime(targetStage.open_from || '08:30');
+      const stageClose = parseTime(targetStage.open_until || '18:00');
+      if (slotMins < stageOpen || slotMins >= stageClose) {
+        setDropError({ stageId, slotMins, colIndex });
+        setTimeout(() => setDropError(null), 1200);
+        return;
+      }
+    }
 
     // Block drop — show duration popup
     if (session._isBlock) {
@@ -2353,12 +2397,13 @@ function NerdConPlanner() {
         )}
       </div>
 
-      <SessionModal isOpen={showModal} onClose={() => { setShowModal(false); setEditingSession(null); }}
+      <SessionModal isOpen={showModal} onClose={() => { setShowModal(false); setEditingSession(null); setPrefillStageId(null); setPrefillTimeMins(null); }}
         onSave={handleSave} onDelete={handleDelete} editingSession={editingSession} speakers={speakers} stages={stages} selectedDay={selectedDay}
         onSpeakerAdded={(sp) => setSpeakers(prev => [...prev, sp])}
         clashInfo={editingSession ? speakerClashes[editingSession.id] : null}
         isIgnored={editingSession ? ignoredClashes.has(editingSession.id) : false}
         onToggleIgnore={toggleIgnoreClash} readOnly={!isEditor}
+        prefillStageId={prefillStageId} prefillTimeMins={prefillTimeMins}
         onCommentsChange={(sessionId, updated) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, comments: updated } : s))} />
 
       <ManageSpeakersModal isOpen={showSpeakersModal} onClose={() => setShowSpeakersModal(false)} speakers={speakers} onSpeakersChange={setSpeakers} />
