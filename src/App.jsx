@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, createContext, useContext } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import { TOPIC_TAGS, TOPIC_TAG_COLORS, FORMAT_TAGS } from './stages.config.js';
@@ -6,6 +6,8 @@ import { TOPIC_TAGS, TOPIC_TAG_COLORS, FORMAT_TAGS } from './stages.config.js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+const AuthContext = createContext({ user: null, profile: null, role: 'commenter' });
 
 // ── Build-view design tokens ("dark cockpit, light worktable") ───────────────
 const BV = {
@@ -124,7 +126,8 @@ const getSeatDisplay = (sessionSpeakers, speakersArr, allSpeakers) => {
   return seats;
 };
 
-function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded, clashInfo, isIgnored, onToggleIgnore }) {
+function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded, clashInfo, isIgnored, onToggleIgnore, readOnly, onCommentsChange }) {
+  const { user: authUser, profile, role } = useContext(AuthContext);
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('placeholder');
   const [format, setFormat] = useState('Panel');
@@ -148,6 +151,10 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [companyInput, setCompanyInput] = useState('');
   const [guestInput, setGuestInput] = useState('');
   const [showAddPlaceholder, setShowAddPlaceholder] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState([]);
+  const [postingComment, setPostingComment] = useState(false);
+  const commentInputRef = useRef(null);
 
   const handleAddSpeaker = async () => {
     if (!newSpkName.trim() || addingSpk) return;
@@ -185,6 +192,8 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setVenue(editingSession.venue || '');
       setHost(editingSession.host || '');
       setInviteOnly(editingSession.invite_only || false);
+      setComments(editingSession.comments || []);
+      setCommentText('');
       if (editingSession.start_time) setStartTime(formatTime24(isoToMinutes(editingSession.start_time)));
     } else {
       setTitle(''); setStatus('placeholder'); setFormat('Panel');
@@ -192,8 +201,38 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setCompanyInput(''); setGuestInput(''); setShowAddPlaceholder(false);
       setTopics([]); setNotes(''); setDescription(''); setStageId(stages[0]?.id || '');
       setCapacity(''); setVenue(''); setHost(''); setInviteOnly(false);
+      setComments([]); setCommentText('');
     }
   }, [editingSession, isOpen, stages]);
+
+  const handlePostComment = async () => {
+    if (!commentText.trim() || !editingSession?.id || postingComment) return;
+    setPostingComment(true);
+    const newComment = {
+      id: uuidv4(),
+      author_email: authUser?.email || '',
+      author_name: profile?.display_name || authUser?.email?.split('@')[0] || 'Unknown',
+      role: role,
+      text: commentText.trim(),
+      created_at: new Date().toISOString(),
+    };
+    const updated = [...comments, newComment];
+    const { error } = await supabase.rpc('update_session_comments', { session_id: editingSession.id, new_comments: updated });
+    if (error) { alert('Failed to post comment: ' + error.message); setPostingComment(false); return; }
+    setComments(updated);
+    setCommentText('');
+    setPostingComment(false);
+    if (onCommentsChange) onCommentsChange(editingSession.id, updated);
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!editingSession?.id) return;
+    const updated = comments.filter(c => c.id !== commentId);
+    const { error } = await supabase.rpc('update_session_comments', { session_id: editingSession.id, new_comments: updated });
+    if (error) { alert('Failed to delete comment: ' + error.message); return; }
+    setComments(updated);
+    if (onCommentsChange) onCommentsChange(editingSession.id, updated);
+  };
 
   if (!isOpen) return null;
 
@@ -220,6 +259,108 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
     onSave(session);
     onClose();
   };
+
+  if (readOnly && editingSession) {
+    const statusDef = SESSION_STATUSES.find(s => s.id === editingSession.status) || SESSION_STATUSES[0];
+    const seats = getSeatDisplay(null, editingSession.speakers, speakers);
+    const stageName = stages.find(s => s.id === editingSession.stage_id)?.name;
+    const spineColor = TYPE_SPINE[editingSession.format] || BV.inkFaint;
+    const startMins = editingSession.start_time ? isoToMinutes(editingSession.start_time) : null;
+    const endMins = startMins !== null ? startMins + (editingSession.duration_minutes || 0) : null;
+    const timeStr = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(endMins)}` : null;
+    return (
+      <ModalShell onClose={onClose} title={editingSession.title || 'Session'} width="540px">
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {/* Summary bar */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            {editingSession.format && <span style={{ fontFamily: BV.mono, fontSize: '9px', letterSpacing: '0.5px', textTransform: 'uppercase', padding: '2px 8px', borderRadius: '3px', fontWeight: 600, background: TYPE_TAG_BG[editingSession.format] || 'rgba(255,255,255,0.06)', color: spineColor }}>{editingSession.format}</span>}
+            <span style={{ fontFamily: BV.mono, fontSize: '9px', letterSpacing: '0.5px', padding: '2px 8px', borderRadius: '3px', background: statusDef.color, color: statusDef.textColor, border: `1px solid ${statusDef.border}` }}>{statusDef.label}</span>
+            {timeStr && <span style={{ fontFamily: BV.mono, fontSize: '10px', color: 'rgba(240,240,240,0.5)' }}>{timeStr}</span>}
+            {stageName && <span style={{ fontFamily: BV.mono, fontSize: '10px', color: 'rgba(240,240,240,0.35)' }}>{stageName}</span>}
+          </div>
+          {/* Speakers */}
+          {seats.length > 0 && (
+            <div style={{ fontSize: '12px', color: 'rgba(240,240,240,0.6)', lineHeight: 1.5 }}>
+              {seats.map((s, i) => <span key={i} style={{
+                ...(s.provisional ? { opacity: 0.7, fontStyle: 'italic' } : {}),
+                ...(s.kind !== 'speaker' ? { fontStyle: 'italic' } : {}),
+              }}>{i > 0 ? ', ' : ''}{s.text}</span>)}
+            </div>
+          )}
+          {/* Topics */}
+          {editingSession.topics?.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+              {editingSession.topics.map(t => <span key={t} style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '12px', background: (TOPIC_TAG_COLORS[t] || '#3568FF') + '22', color: TOPIC_TAG_COLORS[t] || '#3568FF', border: `1px solid ${(TOPIC_TAG_COLORS[t] || '#3568FF')}44` }}>{t}</span>)}
+            </div>
+          )}
+          {/* Description */}
+          {editingSession.description && (
+            <div style={{ fontSize: '12px', color: 'rgba(240,240,240,0.5)', lineHeight: 1.5, borderLeft: '2px solid rgba(255,255,255,0.08)', paddingLeft: '12px' }}>{editingSession.description}</div>
+          )}
+          {/* Notes */}
+          {editingSession.notes && (
+            <div>
+              <div style={{ fontSize: '9px', color: 'rgba(240,240,240,0.3)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '4px' }}>Internal Notes</div>
+              <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', lineHeight: 1.5, fontStyle: 'italic' }}>{editingSession.notes}</div>
+            </div>
+          )}
+        </div>
+
+        {/* Comment Thread */}
+        <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ marginBottom: '12px' }}>
+            <span style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              Comments {comments.length > 0 && `(${comments.length})`}
+            </span>
+          </div>
+
+          {comments.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', maxHeight: '300px', overflowY: 'auto' }}>
+              {comments.map(c => {
+                const isOwn = c.author_email === authUser?.email;
+                const isEditorComment = c.role === 'editor';
+                const timeAgo = (() => {
+                  const diff = Date.now() - new Date(c.created_at).getTime();
+                  const mins = Math.floor(diff / 60000);
+                  if (mins < 1) return 'just now';
+                  if (mins < 60) return `${mins}m ago`;
+                  const hrs = Math.floor(mins / 60);
+                  if (hrs < 24) return `${hrs}h ago`;
+                  return `${Math.floor(hrs / 24)}d ago`;
+                })();
+                return (
+                  <div key={c.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '8px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: isEditorComment ? '#22c55e' : '#eab308' }}>{c.author_name}</span>
+                      <span style={{ fontSize: '8px', letterSpacing: '0.5px', fontWeight: 700, padding: '1px 5px', borderRadius: '3px', background: isEditorComment ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)', color: isEditorComment ? '#22c55e' : '#eab308' }}>{isEditorComment ? 'EDITOR' : 'COMMENTER'}</span>
+                      <span style={{ fontSize: '9px', color: 'rgba(240,240,240,0.25)', marginLeft: 'auto' }}>{timeAgo}</span>
+                      {isOwn && <button onClick={() => handleDeleteComment(c.id)} style={{ background: 'none', border: 'none', color: 'rgba(240,240,240,0.2)', cursor: 'pointer', fontSize: '12px', padding: '0 2px', lineHeight: 1 }} title="Delete comment">&times;</button>}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'rgba(240,240,240,0.7)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{c.text}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input ref={commentInputRef} value={commentText} onChange={e => setCommentText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostComment(); } }}
+              placeholder="Add a comment..." style={{ ...inputStyle, flex: 1, fontSize: '12px', padding: '8px 10px' }} />
+            <button onClick={handlePostComment} disabled={!commentText.trim() || postingComment} style={{
+              background: commentText.trim() ? '#3568FF' : 'rgba(255,255,255,0.05)', border: 'none', borderRadius: '4px', padding: '8px 14px',
+              color: commentText.trim() ? '#fff' : 'rgba(240,240,240,0.2)', cursor: commentText.trim() ? 'pointer' : 'default',
+              fontSize: '11px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.03em', transition: 'all .12s',
+            }}>{postingComment ? '...' : 'Post'}</button>
+          </div>
+        </div>
+
+        <div style={{ padding: '12px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'flex-end' }}>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 16px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>Close</button>
+        </div>
+      </ModalShell>
+    );
+  }
 
   return (
     <ModalShell onClose={onClose} title={editingSession ? (isBlock ? 'Edit Block' : isDay0 ? 'Edit Activation' : 'Edit Session') : (isDay0 ? 'New Activation' : 'New Session')}>
@@ -524,17 +665,97 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
         )}
       </div>
 
+      {/* ── Comment Thread ── */}
+      {editingSession && (
+        <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+            <span style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+              Comments {comments.length > 0 && `(${comments.length})`}
+            </span>
+          </div>
+
+          {comments.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px', maxHeight: '240px', overflowY: 'auto' }}>
+              {comments.map(c => {
+                const isOwn = c.author_email === authUser?.email;
+                const isEditorComment = c.role === 'editor';
+                const timeAgo = (() => {
+                  const diff = Date.now() - new Date(c.created_at).getTime();
+                  const mins = Math.floor(diff / 60000);
+                  if (mins < 1) return 'just now';
+                  if (mins < 60) return `${mins}m ago`;
+                  const hrs = Math.floor(mins / 60);
+                  if (hrs < 24) return `${hrs}h ago`;
+                  const days = Math.floor(hrs / 24);
+                  return `${days}d ago`;
+                })();
+                return (
+                  <div key={c.id} style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: '6px', padding: '8px 12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: 600, color: isEditorComment ? '#22c55e' : '#eab308' }}>
+                        {c.author_name}
+                      </span>
+                      <span style={{
+                        fontSize: '8px', letterSpacing: '0.5px', fontWeight: 700,
+                        padding: '1px 5px', borderRadius: '3px',
+                        background: isEditorComment ? 'rgba(34,197,94,0.12)' : 'rgba(234,179,8,0.12)',
+                        color: isEditorComment ? '#22c55e' : '#eab308',
+                      }}>
+                        {isEditorComment ? 'EDITOR' : 'COMMENTER'}
+                      </span>
+                      <span style={{ fontSize: '9px', color: 'rgba(240,240,240,0.25)', marginLeft: 'auto' }}>{timeAgo}</span>
+                      {isOwn && (
+                        <button onClick={() => handleDeleteComment(c.id)} style={{
+                          background: 'none', border: 'none', color: 'rgba(240,240,240,0.2)', cursor: 'pointer',
+                          fontSize: '12px', padding: '0 2px', lineHeight: 1,
+                        }} title="Delete comment">&times;</button>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '12px', color: 'rgba(240,240,240,0.7)', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{c.text}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <input
+              ref={commentInputRef}
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handlePostComment(); } }}
+              placeholder="Add a comment..."
+              style={{ ...inputStyle, flex: 1, fontSize: '12px', padding: '8px 10px' }}
+            />
+            <button
+              onClick={handlePostComment}
+              disabled={!commentText.trim() || postingComment}
+              style={{
+                background: commentText.trim() ? '#3568FF' : 'rgba(255,255,255,0.05)',
+                border: 'none', borderRadius: '4px', padding: '8px 14px',
+                color: commentText.trim() ? '#fff' : 'rgba(240,240,240,0.2)',
+                cursor: commentText.trim() ? 'pointer' : 'default',
+                fontSize: '11px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.03em',
+                transition: 'all .12s',
+              }}
+            >
+              {postingComment ? '...' : 'Post'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={{ padding: '16px 24px', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          {editingSession && (
+          {editingSession && !readOnly && (
             <button onClick={() => { onDelete(editingSession.id); onClose(); }} style={{ background: 'none', border: '1px solid #3a1a1a', borderRadius: '4px', padding: '8px 16px', color: '#f87171', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>Delete</button>
           )}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 16px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>Cancel</button>
-          <button onClick={handleSave} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '8px 20px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold' }}>
+          <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 16px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>{readOnly ? 'Close' : 'Cancel'}</button>
+          {!readOnly && <button onClick={handleSave} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '8px 20px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold' }}>
             {editingSession ? 'Save Changes' : 'Create Session'}
-          </button>
+          </button>}
         </div>
       </div>
     </ModalShell>
@@ -707,19 +928,19 @@ function BlockDurationPopup({ pending, onConfirm, onCancel }) {
 }
 
 // ── Sidebar Components ────────────────────────────────────────────────────────
-function BlockSidebarItem({ block, onDragStart }) {
+function BlockSidebarItem({ block, onDragStart, isEditor }) {
   return (
     <div
-      draggable="true"
-      onDragStart={(e) => {
+      draggable={isEditor ? "true" : "false"}
+      onDragStart={isEditor ? (e) => {
         e.dataTransfer.setData('text/plain', `block:${block.id}`);
         e.dataTransfer.effectAllowed = 'move';
         onDragStart({ _isBlock: true, block_type: block.id, defaultDuration: block.defaultDuration, label: block.label, color: block.color });
-      }}
+      } : undefined}
       style={{
         background: `${block.color}15`, border: `1px dashed ${block.color}50`,
         borderRadius: '3px', padding: '5px 8px', marginBottom: '4px',
-        cursor: 'grab', fontSize: '10px', color: block.color,
+        cursor: isEditor ? 'grab' : 'default', fontSize: '10px', color: block.color,
         fontWeight: 'bold', letterSpacing: '0.05em', transition: 'opacity 0.15s',
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
       }}
@@ -734,19 +955,19 @@ function BlockSidebarItem({ block, onDragStart }) {
   );
 }
 
-function SidebarCard({ session, speakers, onClick, onDragStart }) {
+function SidebarCard({ session, speakers, onClick, onDragStart, isEditor }) {
   const statusDef = SESSION_STATUSES.find(s => s.id === session.status) || SESSION_STATUSES[0];
   const sessionSpeakers = speakers.filter(sp => getSpeakerIds(session.speakers).includes(sp.id));
   const metaColor = statusDef.textColor;
   return (
-    <div draggable="true"
-      onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(session); }}
+    <div draggable={isEditor ? "true" : "false"}
+      onDragStart={isEditor ? (e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(session); } : undefined}
       onClick={onClick}
       style={{
         background: statusDef.color,
         border: `${statusDef.borderWidth || '1px'} ${statusDef.borderStyle || 'solid'} ${statusDef.border}`,
         borderRadius: '4px',
-        padding: '8px 10px', marginBottom: '6px', cursor: 'grab', transition: 'opacity 0.15s',
+        padding: '8px 10px', marginBottom: '6px', cursor: isEditor ? 'grab' : 'pointer', transition: 'opacity 0.15s',
       }}
       onMouseEnter={e => e.currentTarget.style.opacity = '0.85'}
       onMouseLeave={e => e.currentTarget.style.opacity = '1'}
@@ -768,7 +989,7 @@ function SidebarCard({ session, speakers, onClick, onDragStart }) {
   );
 }
 
-function SidebarPanel({ sessions, speakers, selectedDay, onEdit, onDragStart, isOpen, onToggle }) {
+function SidebarPanel({ sessions, speakers, selectedDay, onEdit, onDragStart, isOpen, onToggle, isEditor }) {
   const unscheduled = sessions.filter(s => (!s.stage_id || !s.day) && s.type !== 'block');
   const scheduled = sessions.filter(s => s.stage_id && s.day && s.day === selectedDay && s.type !== 'block');
 
@@ -783,19 +1004,19 @@ function SidebarPanel({ sessions, speakers, selectedDay, onEdit, onDragStart, is
           {/* Blocks */}
           <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Blocks</div>
-            {BLOCK_TYPES.map(b => <BlockSidebarItem key={b.id} block={b} onDragStart={onDragStart} />)}
+            {isEditor && BLOCK_TYPES.map(b => <BlockSidebarItem key={b.id} block={b} onDragStart={onDragStart} isEditor={isEditor} />)}
           </div>
           {/* Unscheduled */}
           <div style={{ marginBottom: '20px' }}>
             <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Unscheduled ({unscheduled.length})</div>
             {unscheduled.length === 0 ? <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.2)', fontStyle: 'italic', padding: '8px 0' }}>No unscheduled sessions</div>
-              : unscheduled.map(s => <SidebarCard key={s.id} session={s} speakers={speakers} onClick={() => onEdit(s)} onDragStart={onDragStart} />)}
+              : unscheduled.map(s => <SidebarCard key={s.id} session={s} speakers={speakers} onClick={() => onEdit(s)} onDragStart={onDragStart} isEditor={isEditor} />)}
           </div>
           {/* Scheduled */}
           <div>
             <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>Scheduled — {DAYS.find(d => d.id === selectedDay)?.label} ({scheduled.length})</div>
             {scheduled.length === 0 ? <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.2)', fontStyle: 'italic', padding: '8px 0' }}>No sessions for this day</div>
-              : scheduled.map(s => <SidebarCard key={s.id} session={s} speakers={speakers} onClick={() => onEdit(s)} onDragStart={onDragStart} />)}
+              : scheduled.map(s => <SidebarCard key={s.id} session={s} speakers={speakers} onClick={() => onEdit(s)} onDragStart={onDragStart} isEditor={isEditor} />)}
           </div>
         </div>
       )}
@@ -804,7 +1025,7 @@ function SidebarPanel({ sessions, speakers, selectedDay, onEdit, onDragStart, is
 }
 
 // ── Grid Cards ────────────────────────────────────────────────────────────────
-function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo, isClashIgnored }) {
+function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo, isClashIgnored, isEditor }) {
   const sessionSpeakers = speakers.filter(sp => getSpeakerIds(session.speakers).includes(sp.id));
   const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
   const timeLabel = startMins !== null ? `${formatTime24(startMins)}–${formatTime24(startMins + session.duration_minutes)}` : null;
@@ -824,15 +1045,15 @@ function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo
   const titleColor = isPlaceholder ? BV.inkSoft : BV.ink;
 
   return (
-    <div draggable="true"
-      onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
+    <div draggable={isEditor ? "true" : "false"}
+      onDragStart={isEditor ? (e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
       onClick={onClick} style={{
         margin: '0 5px',
         position: 'relative',
         background: cardBg,
         border: `1px ${borderStyle} ${borderColor}`,
         borderLeftWidth: '4px', borderLeftStyle: 'solid', borderLeftColor: spineColor,
-        borderRadius: '7px', padding: dur < 20 ? '2px 7px' : '7px 9px', cursor: 'grab',
+        borderRadius: '7px', padding: dur < 20 ? '2px 7px' : '7px 9px', cursor: isEditor ? 'grab' : 'pointer',
         overflow: 'visible', boxSizing: 'border-box',
         boxShadow: hasActiveClash ? `0 0 0 2px ${BV.clash}33, ${BV.cardShadow}` : BV.cardShadow,
         transition: 'box-shadow .12s, transform .06s', zIndex: 10,
@@ -882,12 +1103,15 @@ function SessionCard({ session, speakers, onClick, style, onDragStart, clashInfo
           }}>{i > 0 ? ', ' : ''}{s.text}</span>)}
         </div>
       ); })()}
-      {dur >= 20 && session.format && <div style={{ marginTop: '4px' }}><span style={{ fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.6px', textTransform: 'uppercase', padding: '1.5px 5px', borderRadius: '3px', fontWeight: 600, background: tagBg, color: spineColor }}>{session.format}</span></div>}
+      {dur >= 20 && <div style={{ marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+        {session.format && <span style={{ fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.6px', textTransform: 'uppercase', padding: '1.5px 5px', borderRadius: '3px', fontWeight: 600, background: tagBg, color: spineColor }}>{session.format}</span>}
+        {session.comments?.length > 0 && <span style={{ fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.3px', padding: '1.5px 5px', borderRadius: '3px', fontWeight: 600, background: '#EFF6FF', color: '#3568FF' }}>{session.comments.length} {session.comments.length === 1 ? 'comment' : 'comments'}</span>}
+      </div>}
     </div>
   );
 }
 
-function BlockCard({ session, onClick, style, onDragStart }) {
+function BlockCard({ session, onClick, style, onDragStart, isEditor }) {
   const blockDef = BLOCK_TYPES.find(b => b.id === session.block_type);
   const isMarker = session.block_type === 'stage-open' || session.block_type === 'stage-close';
   const startMins = session.start_time ? isoToMinutes(session.start_time) : null;
@@ -896,11 +1120,11 @@ function BlockCard({ session, onClick, style, onDragStart }) {
   if (isMarker) {
     const isOpen = session.block_type === 'stage-open';
     return (
-      <div draggable="true"
-        onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
+      <div draggable={isEditor ? "true" : "false"}
+        onDragStart={isEditor ? (e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
         onClick={onClick} style={{
           margin: '0 5px', position: 'absolute', left: 0, right: 0,
-          height: '18px', borderRadius: '4px', cursor: 'grab',
+          height: '18px', borderRadius: '4px', cursor: isEditor ? 'grab' : 'pointer',
           background: isOpen ? '#DCFCE7' : '#FEE2E2',
           color: isOpen ? BV.open : BV.clash,
           fontFamily: BV.mono, fontSize: '8px', letterSpacing: '0.5px', fontWeight: 600,
@@ -914,14 +1138,14 @@ function BlockCard({ session, onClick, style, onDragStart }) {
   }
 
   return (
-    <div draggable="true"
-      onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); }}
+    <div draggable={isEditor ? "true" : "false"}
+      onDragStart={isEditor ? (e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; if (onDragStart) onDragStart(session); } : undefined}
       onClick={onClick} style={{
         margin: '0 5px', position: 'relative',
         height: '9px', borderRadius: '3px',
         background: `repeating-linear-gradient(45deg,#F0EEE5,#F0EEE5 4px,#E8E5DB 4px,#E8E5DB 8px)`,
         display: 'flex', alignItems: 'center',
-        cursor: 'grab', overflow: 'hidden', boxSizing: 'border-box', zIndex: 10,
+        cursor: isEditor ? 'grab' : 'pointer', overflow: 'hidden', boxSizing: 'border-box', zIndex: 10,
         ...style,
       }}
     >
@@ -933,7 +1157,7 @@ function BlockCard({ session, onClick, style, onDragStart }) {
 }
 
 // ── Slot renderer (absolute positioning) ──────────────────────────────────────
-function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIndex, colWidth, isLastCol, dropError, handleDrop, onDragStart, dragSessionRef, openNewSession, onEditSession, speakerClashes, ignoredClashes }) {
+function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIndex, colWidth, isLastCol, dropError, handleDrop, onDragStart, dragSessionRef, openNewSession, onEditSession, speakerClashes, ignoredClashes, isEditor }) {
   const gridStart = TIME_SLOTS[0];
   const gridEnd = TIME_SLOTS[TIME_SLOTS.length - 1] + 5;
   const totalHeight = TIME_SLOTS.length * SLOT_HEIGHT;
@@ -947,11 +1171,11 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
         const isErr = dropError?.stageId === stage.id && dropError?.slotMins === mins && (dropError?.colIndex ?? 0) === colIndex;
         return (
           <div key={mins}
-            onClick={() => isOpen && openNewSession(stage.id, mins)}
-            onDragOver={isOpen ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } : undefined}
-            onDragEnter={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = '#EEEBE2'; } : undefined}
-            onDragLeave={isOpen ? e => { e.currentTarget.style.background = BV.paper; } : undefined}
-            onDrop={isOpen ? e => { e.preventDefault(); e.currentTarget.style.background = BV.paper; handleDrop(stage.id, mins, colIndex); } : undefined}
+            onClick={() => isOpen && isEditor && openNewSession(stage.id, mins)}
+            onDragOver={isOpen && isEditor ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } : undefined}
+            onDragEnter={isOpen && isEditor ? e => { e.preventDefault(); e.currentTarget.style.background = '#EEEBE2'; } : undefined}
+            onDragLeave={isOpen && isEditor ? e => { e.currentTarget.style.background = BV.paper; } : undefined}
+            onDrop={isOpen && isEditor ? e => { e.preventDefault(); e.currentTarget.style.background = BV.paper; handleDrop(stage.id, mins, colIndex); } : undefined}
             style={{
               position: 'absolute', left: 0, right: 0,
               top: `${(mins - gridStart) / 5 * SLOT_HEIGHT}px`,
@@ -959,7 +1183,7 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
               background: isErr ? '#FEE2E2' : BV.paper,
               borderBottom: mins % 60 === 0 ? `1px solid ${BV.paperLine}` : mins % 30 === 0 ? `1px solid ${BV.paperLineSoft}` : 'none',
               borderRight: isLastCol ? `1px solid ${BV.paperLine}` : `1px solid ${BV.paperLineSoft}`,
-              cursor: isOpen ? 'cell' : 'default',
+              cursor: isOpen && isEditor ? 'cell' : 'default',
               outline: isErr ? `1px solid ${BV.clash}` : 'none',
             }}
           />
@@ -1009,9 +1233,9 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
           overflow: 'hidden', zIndex: 10,
         };
         if (session.type === 'block') {
-          return <BlockCard key={session.id} session={session} onClick={() => onEditSession(session)} onDragStart={onDragStart} style={cardStyle} />;
+          return <BlockCard key={session.id} session={session} onClick={() => onEditSession(session)} onDragStart={onDragStart} style={cardStyle} isEditor={isEditor} />;
         }
-        return <SessionCard key={session.id} session={session} speakers={speakers} onClick={() => onEditSession(session)} onDragStart={onDragStart} style={cardStyle} clashInfo={speakerClashes?.[session.id]} isClashIgnored={ignoredClashes?.has(session.id)} />;
+        return <SessionCard key={session.id} session={session} speakers={speakers} onClick={() => onEditSession(session)} onDragStart={onDragStart} style={cardStyle} clashInfo={speakerClashes?.[session.id]} isClashIgnored={ignoredClashes?.has(session.id)} isEditor={isEditor} />;
       })}
     </div>
   );
@@ -1025,7 +1249,7 @@ const RT_TIME_BLOCKS = [
   { start: 16 * 60 + 15, end: 16 * 60 + 55, label: 'Block 4' },
 ];
 
-function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragStart, onEditSession, handleDrop, handleSave, dropError, dragSessionRef, openNewSession }) {
+function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragStart, onEditSession, handleDrop, handleSave, dropError, dragSessionRef, openNewSession, isEditor }) {
   const maxCols = stage.max_columns || 5;
   const allStageSessions = daySessions.filter(s => s.stage_id === stage.id && s.start_time);
 
@@ -1092,11 +1316,11 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                   const rtBorderColor = isPlaceholderRT ? BV.paperLine : isPencilledRT ? '#d97706' : BV.cardBorder;
                   const rtBorderStyle = isPlaceholderRT ? 'dashed' : 'solid';
                   return (
-                    <div key={colIdx} draggable="true"
-                      onDragStart={(e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(session); }}
+                    <div key={colIdx} draggable={isEditor ? "true" : "false"}
+                      onDragStart={isEditor ? (e) => { e.dataTransfer.setData('text/plain', session.id); e.dataTransfer.effectAllowed = 'move'; onDragStart(session); } : undefined}
                       onClick={() => onEditSession(session)}
                       style={{
-                        width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '7px', cursor: 'grab',
+                        width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '7px', cursor: isEditor ? 'grab' : 'pointer',
                         background: isPlaceholderRT ? `repeating-linear-gradient(45deg,${BV.card},${BV.card} 7px,#F4F2EA 7px,#F4F2EA 14px)` : BV.card,
                         border: `1px ${rtBorderStyle} ${rtBorderColor}`,
                         borderLeft: `4px solid ${spineColor}`,
@@ -1124,14 +1348,14 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                 // Empty slot — droppable
                 return (
                   <div key={colIdx}
-                    onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
-                    onDragEnter={e => { e.preventDefault(); e.currentTarget.style.borderColor = stage.color; e.currentTarget.style.background = BV.paperLineSoft; }}
-                    onDragLeave={e => { e.currentTarget.style.borderColor = BV.paperLine; e.currentTarget.style.background = 'transparent'; }}
-                    onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = BV.paperLine; e.currentTarget.style.background = 'transparent'; handleDrop(stage.id, block.start, colIdx); }}
-                    onClick={() => openNewSession(stage.id, block.start)}
+                    onDragOver={isEditor ? e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; } : undefined}
+                    onDragEnter={isEditor ? e => { e.preventDefault(); e.currentTarget.style.borderColor = stage.color; e.currentTarget.style.background = BV.paperLineSoft; } : undefined}
+                    onDragLeave={isEditor ? e => { e.currentTarget.style.borderColor = BV.paperLine; e.currentTarget.style.background = 'transparent'; } : undefined}
+                    onDrop={isEditor ? e => { e.preventDefault(); e.currentTarget.style.borderColor = BV.paperLine; e.currentTarget.style.background = 'transparent'; handleDrop(stage.id, block.start, colIdx); } : undefined}
+                    onClick={isEditor ? () => openNewSession(stage.id, block.start) : undefined}
                     style={{
                       width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '4px',
-                      border: `1px dashed ${BV.paperLine}`, cursor: 'cell',
+                      border: `1px dashed ${BV.paperLine}`, cursor: isEditor ? 'cell' : 'default',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       minHeight: '48px', transition: 'all 0.15s',
                     }}
@@ -1415,7 +1639,7 @@ function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
 }
 
 // ── Day 0 Activations List ────────────────────────────────────────────────────
-function ActivationsList({ sessions, selectedDay, onEdit, onNew }) {
+function ActivationsList({ sessions, selectedDay, onEdit, onNew, isEditor }) {
   const activations = sessions
     .filter(s => s.day === selectedDay && s.type === 'event')
     .sort((a, b) => {
@@ -1431,12 +1655,12 @@ function ActivationsList({ sessions, selectedDay, onEdit, onNew }) {
           <div style={{ fontSize: '12px', color: 'rgba(240,240,240,0.4)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
             Activations · Day 0 ({activations.length})
           </div>
-          <button onClick={onNew} style={{
+          {isEditor && <button onClick={onNew} style={{
             background: '#3568FF', border: 'none', borderRadius: '8px',
             padding: '8px 20px', color: '#fff', cursor: 'pointer',
             fontSize: '12px', fontFamily: "'JetBrains Mono', ui-monospace, monospace",
             fontWeight: 'bold', letterSpacing: '0.05em',
-          }}>+ Add Activation</button>
+          }}>+ Add Activation</button>}
         </div>
 
         {activations.length === 0 ? (
@@ -1596,8 +1820,141 @@ function CapacityRail({ stages, daySessions, selectedDay }) {
   );
 }
 
+// ── Login Screen ─────────────────────────────────────────────────────────────
+function LoginScreen() {
+  const [email, setEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    if (!email.trim() || sending) return;
+    setSending(true);
+    setError(null);
+    const { error: authError } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: window.location.origin },
+    });
+    if (authError) {
+      setError(authError.message);
+      setSending(false);
+    } else {
+      setSent(true);
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: BV.cockpit, fontFamily: BV.sans,
+    }}>
+      <div style={{
+        width: '380px', padding: '40px', borderRadius: '12px',
+        background: '#1a1b1f', border: `1px solid ${BV.cockpitLine}`,
+        boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+      }}>
+        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+          <div style={{ fontFamily: BV.mono, fontSize: '14px', fontWeight: 800, letterSpacing: '2px', color: '#fff', marginBottom: '4px' }}>
+            FINTECH NERDCON<span style={{ color: '#E63917' }}>.</span>
+          </div>
+          <div style={{ fontFamily: BV.mono, fontSize: '10px', letterSpacing: '1px', color: BV.inkFaint }}>BUILD VIEW</div>
+        </div>
+
+        {sent ? (
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '32px', marginBottom: '12px' }}>📬</div>
+            <div style={{ fontSize: '14px', color: '#d4d6dc', marginBottom: '8px' }}>Check your email</div>
+            <div style={{ fontSize: '12px', color: BV.inkFaint, lineHeight: 1.5 }}>
+              We sent a magic link to <strong style={{ color: '#fff' }}>{email}</strong>.
+              Click it to sign in. Check spam if you don't see it.
+            </div>
+            <button onClick={() => { setSent(false); setEmail(''); }} style={{
+              marginTop: '20px', background: 'none', border: `1px solid ${BV.cockpitLine}`,
+              borderRadius: '6px', padding: '8px 16px', cursor: 'pointer',
+              fontSize: '11px', color: BV.inkFaint, fontFamily: BV.mono, letterSpacing: '0.5px',
+            }}>Try a different email</button>
+          </div>
+        ) : (
+          <form onSubmit={handleLogin}>
+            <label style={{ display: 'block', fontSize: '10px', letterSpacing: '0.8px', color: BV.inkFaint, marginBottom: '6px', fontFamily: BV.mono }}>EMAIL</label>
+            <input
+              type="email" value={email} onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com" autoFocus required
+              style={{
+                width: '100%', padding: '12px 14px', fontSize: '14px', fontFamily: BV.sans,
+                background: BV.cockpit, border: `1px solid ${BV.cockpitLine}`, borderRadius: '6px',
+                color: '#fff', outline: 'none', boxSizing: 'border-box',
+              }}
+              onFocus={e => e.target.style.borderColor = '#3568FF'}
+              onBlur={e => e.target.style.borderColor = BV.cockpitLine}
+            />
+            {error && <div style={{ fontSize: '11px', color: '#f87171', marginTop: '8px' }}>{error}</div>}
+            <button type="submit" disabled={!email.trim() || sending} style={{
+              width: '100%', marginTop: '16px', padding: '12px', fontSize: '13px', fontWeight: 600,
+              fontFamily: BV.sans, letterSpacing: '0.3px',
+              background: email.trim() ? '#3568FF' : '#2a2c33', border: 'none', borderRadius: '6px',
+              color: email.trim() ? '#fff' : BV.inkFaint, cursor: email.trim() ? 'pointer' : 'default',
+            }}>
+              {sending ? 'Sending…' : 'Send magic link'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Auth Wrapper ─────────────────────────────────────────────────────────────
+export default function App() {
+  const [authUser, setAuthUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthUser(session?.user ?? null);
+      if (session?.user) loadProfile(session.user.id);
+      else setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+      if (session?.user) loadProfile(session.user.id);
+      else { setProfile(null); setAuthLoading(false); }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const loadProfile = async (userId) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    setProfile(data);
+    setAuthLoading(false);
+  };
+
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: BV.cockpit }}>
+        <div style={{ fontFamily: BV.mono, fontSize: '12px', color: BV.inkFaint, letterSpacing: '1px' }}>LOADING…</div>
+      </div>
+    );
+  }
+
+  if (!authUser) return <LoginScreen />;
+
+  const role = profile?.role || 'commenter';
+
+  return (
+    <AuthContext.Provider value={{ user: authUser, profile, role }}>
+      <NerdConPlanner />
+    </AuthContext.Provider>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────
-export default function NerdConPlanner() {
+function NerdConPlanner() {
+  const { user: authUser, profile, role } = useContext(AuthContext);
+  const isEditor = role === 'editor';
   const [sessions, setSessions] = useState([]);
   const [speakers, setSpeakers] = useState([]);
   const [stages, setStages] = useState([]);
@@ -1678,11 +2035,13 @@ export default function NerdConPlanner() {
   };
 
   const openNewSession = (stageId, timeMins) => {
+    if (!isEditor) return;
     setEditingSession(null);
     setShowModal(true);
   };
 
   const handleDrop = async (stageId, slotMins, colIndex = 0) => {
+    if (!isEditor) return;
     const session = dragSessionRef.current;
     if (!session) return;
     dragSessionRef.current = null;
@@ -1828,11 +2187,22 @@ export default function NerdConPlanner() {
           ))}
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button onClick={() => setShowSpeakersModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>SPEAKERS</button>
-          <button onClick={() => setShowRegistrations(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>SIGNUPS</button>
-          <button onClick={() => setShowStagesModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>STAGES</button>
-          <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#2563EB', border: '1px solid #2563EB', color: '#fff', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', fontWeight: 600, display: 'flex', gap: '6px', alignItems: 'center' }}>+ NEW SESSION</button>
+          {isEditor && <button onClick={() => setShowSpeakersModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>SPEAKERS</button>}
+          {isEditor && <button onClick={() => setShowRegistrations(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>SIGNUPS</button>}
+          {isEditor && <button onClick={() => setShowStagesModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>STAGES</button>}
+          {isEditor && <button onClick={() => { setEditingSession(null); setShowModal(true); }} style={{ background: '#2563EB', border: '1px solid #2563EB', color: '#fff', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', fontWeight: 600, display: 'flex', gap: '6px', alignItems: 'center' }}>+ NEW SESSION</button>}
           <a href="/view" target="_blank" rel="noopener noreferrer" style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', textDecoration: 'none', display: 'flex', gap: '6px', alignItems: 'center' }}>VIEW</a>
+          <div style={{ width: '1px', height: '20px', background: BV.cockpitLine, margin: '0 4px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontFamily: BV.mono, fontSize: '9px', color: BV.inkFaint, letterSpacing: '0.5px' }}>
+              {profile?.display_name || authUser?.email?.split('@')[0]} <span style={{ color: isEditor ? '#22c55e' : '#eab308', fontWeight: 600 }}>{isEditor ? 'EDITOR' : 'VIEW'}</span>
+            </span>
+            <button onClick={() => supabase.auth.signOut()} style={{
+              background: 'none', border: `1px solid ${BV.cockpitLine}`, borderRadius: '5px',
+              padding: '4px 10px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '9px',
+              color: BV.inkFaint, letterSpacing: '0.5px',
+            }}>OUT</button>
+          </div>
         </div>
       </div>
 
@@ -1844,13 +2214,13 @@ export default function NerdConPlanner() {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {selectedDay !== 'day0' && (
           <SidebarPanel sessions={sessions} speakers={speakers} selectedDay={selectedDay}
-            onEdit={onEditSession} onDragStart={onDragStart} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(p => !p)} />
+            onEdit={onEditSession} onDragStart={onDragStart} isOpen={sidebarOpen} onToggle={() => setSidebarOpen(p => !p)} isEditor={isEditor} />
         )}
 
         {loading ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3568FF' }}>Loading...</div>
         ) : selectedDay === 'day0' ? (
-          <ActivationsList sessions={sessions} selectedDay="day0" onEdit={onEditSession} onNew={() => { setEditingSession(null); setShowModal(true); }} />
+          <ActivationsList sessions={sessions} selectedDay="day0" onEdit={onEditSession} onNew={() => { setEditingSession(null); setShowModal(true); }} isEditor={isEditor} />
         ) : (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <div style={{ display: 'inline-flex', flexDirection: 'column', minWidth: '100%' }}>
@@ -1945,6 +2315,7 @@ export default function NerdConPlanner() {
                                 onEditSession={onEditSession}
                                 speakerClashes={speakerClashes}
                                 ignoredClashes={ignoredClashes}
+                                isEditor={isEditor}
                               />
                             );
                           })}
@@ -1972,6 +2343,7 @@ export default function NerdConPlanner() {
                 dropError={dropError}
                 dragSessionRef={dragSessionRef}
                 openNewSession={openNewSession}
+                isEditor={isEditor}
               />
             ))}
 
@@ -1986,7 +2358,8 @@ export default function NerdConPlanner() {
         onSpeakerAdded={(sp) => setSpeakers(prev => [...prev, sp])}
         clashInfo={editingSession ? speakerClashes[editingSession.id] : null}
         isIgnored={editingSession ? ignoredClashes.has(editingSession.id) : false}
-        onToggleIgnore={toggleIgnoreClash} />
+        onToggleIgnore={toggleIgnoreClash} readOnly={!isEditor}
+        onCommentsChange={(sessionId, updated) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, comments: updated } : s))} />
 
       <ManageSpeakersModal isOpen={showSpeakersModal} onClose={() => setShowSpeakersModal(false)} speakers={speakers} onSpeakersChange={setSpeakers} />
 
