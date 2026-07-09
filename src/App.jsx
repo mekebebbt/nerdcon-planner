@@ -24,13 +24,13 @@ const TYPE_SPINE = {
   Keynote: '#C2410C', Panel: '#2563EB', Podcast: '#7C3AED', Workshop: '#0D9488',
   Roundtable: '#CA8A04', 'Fireside Chat': '#DB2777', Demo: '#059669',
   Bootcamp: '#0369A1', Interview: '#9333EA', 'Q&A': '#B45309',
-  Rant: '#E63917',
+  Rant: '#E63917', Debate: '#6D28D9', Teardown: '#DC2626',
 };
 const TYPE_TAG_BG = {
   Keynote: '#FDEBE2', Panel: '#E4ECFE', Podcast: '#EEE6FD', Workshop: '#DCF5F1',
   Roundtable: '#FEF3C7', 'Fireside Chat': '#FCE7F3', Demo: '#D1FAE5',
   Bootcamp: '#DBEAFE', Interview: '#EDE9FE', 'Q&A': '#FEF3C7',
-  Rant: '#FEE2E2',
+  Rant: '#FEE2E2', Debate: '#EDE9FE', Teardown: '#FEE2E2',
 };
 
 const DAYS = [
