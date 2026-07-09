@@ -151,6 +151,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [companyInput, setCompanyInput] = useState('');
   const [guestInput, setGuestInput] = useState('');
   const [showAddPlaceholder, setShowAddPlaceholder] = useState(false);
+  const [sessionDate, setSessionDate] = useState('');
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState([]);
   const [postingComment, setPostingComment] = useState(false);
@@ -192,6 +193,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setVenue(editingSession.venue || '');
       setHost(editingSession.host || '');
       setInviteOnly(editingSession.invite_only || false);
+      setSessionDate(editingSession.session_date || DAYS.find(d => d.id === editingSession.day)?.full || '');
       setComments(editingSession.comments || []);
       setCommentText('');
       if (editingSession.start_time) setStartTime(formatTime24(isoToMinutes(editingSession.start_time)));
@@ -203,6 +205,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setCompanyInput(''); setGuestInput(''); setShowAddPlaceholder(false);
       setTopics([]); setNotes(''); setDescription('');
       setStageId(prefillStageId || stages[0]?.id || '');
+      setSessionDate(DAYS.find(d => d.id === selectedDay)?.full || '');
       setCapacity(''); setVenue(''); setHost(''); setInviteOnly(false);
       setComments([]); setCommentText('');
     }
@@ -244,20 +247,23 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const handleSave = () => {
     const [h, m] = startTime.split(':').map(Number);
     const startMins = h * 60 + m;
+    const dateForIso = sessionDate || DAYS.find(d => d.id === selectedDay)?.full;
+    const derivedDay = DAYS.find(d => d.full === sessionDate)?.id || selectedDay;
     const session = {
       ...(editingSession || {}),
       id: editingSession?.id || null,
       title: title || (isDay0 ? 'Activation' : `${format} Session`),
       status: isBlock ? 'block' : status, format: isDay0 ? null : format, duration_minutes: duration,
       speakers: isDay0 ? [] : selectedSpeakers, topics: isDay0 ? [] : topics, notes, description,
-      stage_id: isDay0 ? null : stageId, day: selectedDay,
+      stage_id: isDay0 ? null : stageId, day: derivedDay,
+      session_date: sessionDate || null,
       capacity: capacity === '' ? null : Number(capacity),
       venue: isDay0 ? (venue || null) : (editingSession?.venue || null),
       host: isDay0 ? (host || null) : (editingSession?.host || null),
       invite_only: isDay0 ? inviteOnly : (editingSession?.invite_only || false),
       type: isDay0 ? 'event' : (editingSession?.type || null),
-      start_time: minutesToIso(DAYS.find(d => d.id === selectedDay)?.full, startMins),
-      end_time: minutesToIso(DAYS.find(d => d.id === selectedDay)?.full, startMins + duration),
+      start_time: minutesToIso(dateForIso, startMins),
+      end_time: minutesToIso(dateForIso, startMins + duration),
     };
     onSave(session);
     onClose();
@@ -439,6 +445,12 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
               <label style={labelStyle}>Stage</label>
               <select value={stageId} onChange={e => setStageId(e.target.value)} style={inputStyle}>
                 {stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={labelStyle}>Date</label>
+              <select value={sessionDate} onChange={e => setSessionDate(e.target.value)} style={inputStyle}>
+                {DAYS.map(d => <option key={d.id} value={d.full}>{d.label} — {d.date}</option>)}
               </select>
             </div>
           </div>
