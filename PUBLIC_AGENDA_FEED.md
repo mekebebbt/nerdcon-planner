@@ -31,6 +31,9 @@ This is the Supabase **anon** key — safe to use client-side. It grants read-on
 | `description`     | `text`    | Public description (may be empty) |
 | `stage_name`      | `text`    | Stage name (e.g. Main Quest, Bootcamp) |
 | `hall_name`       | `text`    | Hall name (e.g. Hall 1, Hall 2) |
+| `display_group`   | `text`    | Stage grouping for public layout: `main`, `zone`, or `signup` (see below) |
+| `stage_sort_order`| `integer` | Stage display order within its group |
+| `session_date`    | `date`    | Session date (e.g. `2026-11-19`) |
 | `capacity`        | `integer` | Seat capacity (null if unlimited) |
 | `invite_only`     | `boolean` | Whether the session is invite-only |
 | `speakers`        | `jsonb`   | Array of confirmed speakers (see below), or `null` |
@@ -69,8 +72,11 @@ Provisional speakers, company placeholders, and guest placeholders are excluded 
     "duration_minutes": 20,
     "format": "Keynote",
     "description": "",
+    "session_date": "2026-11-19",
     "stage_name": "Main Quest",
     "hall_name": "Hall 1",
+    "display_group": "main",
+    "stage_sort_order": 1,
     "capacity": null,
     "invite_only": false,
     "speakers": [
@@ -85,6 +91,26 @@ Provisional speakers, company placeholders, and guest placeholders are excluded 
   }
 ]
 ```
+
+## Display groups (public agenda sections)
+
+The `display_group` field on each stage controls which section a session appears in on the public website. Set it in the planner — adding a new stage and setting its group will make it appear in the right section with zero code changes.
+
+| Value    | Section           | Layout | Description |
+|----------|-------------------|--------|-------------|
+| `main`   | Main Stage        | Single chronological stream | Shared morning sessions on the Main Quest stage |
+| `zone`   | Content Zones     | Responsive side-by-side grid, one card per stage | Parallel tracks (Stableverse, The Vault, Bootcamp, etc.) |
+| `signup` | Sign-up Experiences | Grouped by time block | Capped sessions like Roundtables — shows capacity and "Reserve a seat" CTA |
+
+Default is `zone`, so new stages appear in Content Zones unless explicitly set otherwise.
+
+### Current stage assignments
+
+| Stage | display_group |
+|-------|---------------|
+| Main Quest | `main` |
+| AI Command Center, Stableverse, Compliance Nerd Corner, The Vault, Agentic Commerce Playground, Bootcamp, Podcast Stage, Meetups | `zone` |
+| Roundtables | `signup` |
 
 ## CSV export
 

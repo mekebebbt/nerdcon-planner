@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Public Agenda Preview</title>
+<style>body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;background:#fafafa;color:#1a1a1a}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+import React from 'https://esm.sh/react@19'
+import ReactDOM from 'https://esm.sh/react-dom@19/client'
+import { createElement as h, useState, useEffect, useMemo } from 'https://esm.sh/react@19'
+
+const SUPABASE_URL = "https://nrlonrxyvlfymwjjdvhh.supabase.co"
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ybG9ucnh5dmxmeW13ampkdmhoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNjIwMzMsImV4cCI6MjA4ODYzODAzM30.yDN5RhcuQ81nzfCscbfKrmGl9WkfusEdbmzM51pBni8"
+
+const DAY_LABELS={day0:{short:"Day 0",date:"Wed · Nov 18"},day1:{short:"Day 1",date:"Thu · Nov 19"},day2:{short:"Day 2",date:"Fri · Nov 20"}}
+
+function formatTime(iso){if(!iso)return"";const d=new Date(iso);return d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"America/Los_Angeles"})}
+function initials(name){return name.split(" ").map(w=>w[0]).join("").toUpperCase().slice(0,2)}
+
+function SessionCard({session,isSignup}){
+  const[open,setOpen]=useState(false)
+  const timeLabel=session.start_time&&session.end_time?`${formatTime(session.start_time)} – ${formatTime(session.end_time)}`:""
+  return h('div',{className:`pa-session ${open?"pa-session--open":""}`,onClick:()=>setOpen(!open)},
+    h('span',{className:'pa-session__chevron'},open?"▴":"▾"),
+    timeLabel&&h('div',{className:'pa-session__time'},timeLabel),
+    h('div',{className:'pa-session__title'},session.title),
+    session.speakers?.length>0&&h('div',{className:'pa-session__speakers-preview'},session.speakers.map(sp=>sp.name).join(", ")),
+    h('div',{className:'pa-session__tags'},
+      session.format&&h('span',{className:'pa-session__format'},session.format),
+      isSignup&&session.capacity&&h('span',{className:'pa-session__capacity'},'Cap '+session.capacity)
+    ),
+    open&&h('div',{className:'pa-session__detail'},
+      h('div',{className:'pa-session__detail-inner'},
+        session.description&&h('p',{className:'pa-session__description'},session.description),
+        session.speakers?.length>0&&h('div',{className:'pa-session__speakers-list'},
+          session.speakers.map((sp,i)=>h('div',{key:i,className:'pa-session__speaker'},
+            h('div',{className:'pa-session__speaker-avatar'},sp.headshot_url?h('img',{src:sp.headshot_url,alt:sp.name}):initials(sp.name)),
+            h('div',null,
+              h('div',{className:'pa-session__speaker-name'},sp.name,sp.role==="moderator"&&" (mod)"),
+              h('div',{className:'pa-session__speaker-role'},[sp.title,sp.company].filter(Boolean).join(" · "))
+            )
+          ))
+        ),
+        h('div',{className:'pa-session__meta'},
+          session.stage_name&&h('span',null,h('b',null,'Stage: '),session.stage_name),
+          session.format&&h('span',null,h('b',null,'Format: '),session.format),
+          h('span',null,h('b',null,'Length: '),session.duration_minutes,' min'),
+          session.capacity&&h('span',null,h('b',null,'Capacity: '),session.capacity)
+        ),
+        h('span',{className:'pa-session__cta'},isSignup?'Reserve a seat':'Add to my agenda')
+      )
+    )
+  )
+}
+
+function PublicAgenda(){
+  const[sessions,setSessions]=useState([])
+  const[loading,setLoading]=useState(true)
+  const[error,setError]=useState(null)
+  const[selectedDay,setSelectedDay]=useState(null)
+  const[formatFilter,setFormatFilter]=useState(null)
+
+  useEffect(()=>{
+    fetch(`${SUPABASE_URL}/rest/v1/public_agenda?select=*&order=day,start_time`,{
+      headers:{apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${SUPABASE_ANON_KEY}`}
+    }).then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()})
+    .then(data=>{setSessions(data);const days=[...new Set(data.map(s=>s.day))].sort();if(days.length>0)setSelectedDay(days[0]);setLoading(false)})
+    .catch(e=>{setError(e.message);setLoading(false)})
+  },[])
+
+  const days=useMemo(()=>[...new Set(sessions.map(s=>s.day))].sort(),[sessions])
+  const formats=useMemo(()=>[...new Set(sessions.map(s=>s.format).filter(Boolean))].sort(),[sessions])
+  const daySessions=useMemo(()=>{let f=sessions.filter(s=>s.day===selectedDay);if(formatFilter)f=f.filter(s=>s.format===formatFilter);return f},[sessions,selectedDay,formatFilter])
+  const mainSessions=useMemo(()=>daySessions.filter(s=>s.display_group==='main').sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||'')),[daySessions])
+  const zoneStages=useMemo(()=>{const zones=daySessions.filter(s=>s.display_group==='zone');const g={};for(const s of zones){const k=s.stage_name||'Other';if(!g[k])g[k]={sessions:[],sort:s.stage_sort_order||99};g[k].sessions.push(s)};return Object.entries(g).sort(([,a],[,b])=>a.sort-b.sort).map(([name,{sessions}])=>({name,sessions:sessions.sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''))}));},[daySessions])
+  const signupSessions=useMemo(()=>{const s=daySessions.filter(s=>s.display_group==='signup').sort((a,b)=>(a.start_time||'').localeCompare(b.start_time||''));const blocks={};for(const sess of s){const k=sess.start_time?formatTime(sess.start_time):'TBD';if(!blocks[k])blocks[k]={time:sess.start_time,sessions:[]};blocks[k].sessions.push(sess)};return Object.values(blocks).sort((a,b)=>(a.time||'').localeCompare(b.time||''))},[daySessions])
+
+  if(loading)return h('div',{className:'pa'},h('p',{className:'pa__loading'},'Loading agenda…'))
+  if(error)return h('div',{className:'pa'},h('p',{className:'pa__error'},'Failed to load: '+error))
+  if(sessions.length===0)return h('div',{className:'pa'},h('p',{className:'pa__empty'},'No confirmed sessions yet.'))
+
+  return h('div',{className:'pa'},
+    h('style',null,`
+      .pa{font-family:inherit;max-width:1160px;margin:0 auto;padding:0 20px 80px}
+      .pa__day-tabs{display:flex;gap:8px;justify-content:center;padding:14px 0;flex-wrap:wrap}
+      .pa__day-tab{background:transparent;border:1px solid #e4e4e4;border-radius:10px;padding:10px 20px;cursor:pointer;text-align:center;min-width:120px;font-family:inherit}
+      .pa__day-tab:hover{border-color:#999}
+      .pa__day-tab--active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+      .pa__day-tab-date{font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.7}
+      .pa__day-tab-label{font-size:16px;font-weight:700;margin-top:2px}
+      .pa__filters{display:flex;gap:8px;justify-content:center;padding:14px 0 0;flex-wrap:wrap}
+      .pa__filter{font-size:12px;padding:6px 12px;border-radius:20px;border:1px solid #e4e4e4;background:transparent;cursor:pointer;color:#666;font-family:inherit}
+      .pa__filter:hover{border-color:#999}
+      .pa__filter--active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+      .pa__section{margin-top:34px}
+      .pa__section-title{font-size:20px;font-weight:700;letter-spacing:-.3px}
+      .pa__section-sub{font-size:13px;color:#666;margin-top:4px;margin-bottom:16px}
+      .pa__stream{display:flex;flex-direction:column;gap:10px}
+      .pa__zones{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}
+      .pa__zone{border:1px solid #e4e4e4;border-radius:12px;overflow:hidden;align-self:start}
+      .pa__zone-header{padding:12px 14px;border-bottom:1px solid #e4e4e4;border-left:4px solid #2563eb}
+      .pa__zone-name{font-weight:700;font-size:14px}
+      .pa__zone-body{padding:8px}
+      .pa__time-block{margin-bottom:20px}
+      .pa__time-block-label{font-size:14px;font-weight:700;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #e4e4e4}
+      .pa__time-block-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+      .pa-session{padding:11px 12px;border-radius:8px;cursor:pointer;position:relative;border:1px solid #e4e4e4}
+      .pa-session:hover{border-color:#2563eb}
+      .pa__zone-body .pa-session{border:none;border-radius:0}
+      .pa__zone-body .pa-session+.pa-session{border-top:1px solid #e4e4e4}
+      .pa-session__chevron{position:absolute;top:12px;right:12px;color:#999;font-size:11px}
+      .pa-session__time{font-size:12px;color:#999;font-variant-numeric:tabular-nums}
+      .pa-session__title{font-size:14.5px;font-weight:650;margin:3px 0 5px;letter-spacing:-.1px;line-height:1.25}
+      .pa__stream .pa-session__title{font-size:16px}
+      .pa-session__speakers-preview{font-size:12px;color:#666;margin-top:4px}
+      .pa-session__tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+      .pa-session__format{display:inline-block;font-size:10px;letter-spacing:.4px;text-transform:uppercase;background:#f0f0f0;color:#666;padding:2px 7px;border-radius:4px;font-weight:600}
+      .pa-session__capacity{display:inline-block;font-size:10px;letter-spacing:.4px;background:#fef3c7;color:#92400e;padding:2px 7px;border-radius:4px;font-weight:600}
+      .pa-session__detail{margin-top:10px;border-top:1px solid #e4e4e4;padding-top:10px}
+      .pa-session__description{font-size:13px;color:#333;line-height:1.55;margin-bottom:12px}
+      .pa-session__speakers-list{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+      .pa-session__speaker{display:flex;align-items:center;gap:10px}
+      .pa-session__speaker-avatar{width:34px;height:34px;border-radius:50%;background:#e6e6e6;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#888;overflow:hidden;flex-shrink:0}
+      .pa-session__speaker-avatar img{width:100%;height:100%;object-fit:cover}
+      .pa-session__speaker-name{font-size:13px;font-weight:650}
+      .pa-session__speaker-role{font-size:11.5px;color:#666}
+      .pa-session__meta{display:flex;gap:16px;font-size:12px;color:#666;margin-top:10px;flex-wrap:wrap}
+      .pa-session__meta b{color:#1a1a1a;font-weight:600}
+      .pa-session__cta{display:inline-block;font-size:12px;font-weight:600;background:#1a1a1a;color:#fff;padding:8px 14px;border-radius:7px;margin-top:12px;cursor:pointer}
+      .pa__loading,.pa__error,.pa__empty{text-align:center;padding:40px 0;color:#666}
+    `),
+    h('div',{className:'pa__day-tabs'},days.map(day=>{
+      const label=DAY_LABELS[day]||{short:day,date:''};
+      return h('button',{key:day,className:`pa__day-tab ${selectedDay===day?'pa__day-tab--active':''}`,onClick:()=>setSelectedDay(day)},
+        h('div',{className:'pa__day-tab-date'},label.date),
+        h('div',{className:'pa__day-tab-label'},label.short)
+      )
+    })),
+    h('div',{className:'pa__filters'},
+      h('button',{className:`pa__filter ${!formatFilter?'pa__filter--active':''}`,onClick:()=>setFormatFilter(null)},'All formats'),
+      ...formats.map(f=>h('button',{key:f,className:`pa__filter ${formatFilter===f?'pa__filter--active':''}`,onClick:()=>setFormatFilter(formatFilter===f?null:f)},f+'s'))
+    ),
+    mainSessions.length>0&&h('div',{className:'pa__section'},
+      h('div',{className:'pa__section-header'},h('h2',{className:'pa__section-title'},'Main Stage'),h('p',{className:'pa__section-sub'},'Everyone together — the day opens on the Main Quest stage.')),
+      h('div',{className:'pa__stream'},mainSessions.map(s=>h(SessionCard,{key:s.session_id,session:s})))
+    ),
+    zoneStages.length>0&&h('div',{className:'pa__section'},
+      h('div',{className:'pa__section-header'},h('h2',{className:'pa__section-title'},'Content Zones'),h('p',{className:'pa__section-sub'},'Parallel tracks — pick your path.')),
+      h('div',{className:'pa__zones'},zoneStages.map(zone=>h('div',{key:zone.name,className:'pa__zone'},
+        h('div',{className:'pa__zone-header'},h('div',{className:'pa__zone-name'},zone.name)),
+        h('div',{className:'pa__zone-body'},zone.sessions.map(s=>h(SessionCard,{key:s.session_id,session:s})))
+      )))
+    ),
+    signupSessions.length>0&&h('div',{className:'pa__section'},
+      h('div',{className:'pa__section-header'},h('h2',{className:'pa__section-title'},'Sign-up Experiences'),h('p',{className:'pa__section-sub'},'Capped sessions — reserve your seat in advance.')),
+      signupSessions.map(block=>h('div',{key:block.time,className:'pa__time-block'},
+        h('div',{className:'pa__time-block-label'},block.time?formatTime(block.time):'Time TBD'),
+        h('div',{className:'pa__time-block-grid'},block.sessions.map(s=>h(SessionCard,{key:s.session_id,session:s,isSignup:true})))
+      ))
+    )
+  )
+}
+
+const root=ReactDOM.createRoot(document.getElementById('root'))
+root.render(h(PublicAgenda))
+</script>
+</body>
+</html>
