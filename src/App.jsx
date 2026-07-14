@@ -116,7 +116,8 @@ const getSeatDisplay = (sessionSpeakers, speakersArr, allSpeakers) => {
       if (!sp) continue;
       const prefix = entry.role === 'moderator' ? '[MOD] ' : '';
       const suffix = entry.status === 'provisional' ? ' (TBC)' : '';
-      seats.push({ text: `${prefix}${sp.name}${suffix}`, provisional: entry.status === 'provisional', kind: 'speaker' });
+      const company = sp.company ? ` (${sp.company})` : '';
+      seats.push({ text: `${prefix}${sp.name}${company}${suffix}`, provisional: entry.status === 'provisional', kind: 'speaker' });
     } else if (entry.kind === 'company') {
       seats.push({ text: entry.label || 'Company TBD', provisional: true, kind: 'company' });
     } else if (entry.kind === 'guest') {
