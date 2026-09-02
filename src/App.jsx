@@ -156,6 +156,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [commentText, setCommentText] = useState('');
   const [comments, setComments] = useState([]);
   const [postingComment, setPostingComment] = useState(false);
+  const [saving, setSaving] = useState(false);
   const commentInputRef = useRef(null);
 
   const handleAddSpeaker = async () => {
@@ -245,7 +246,8 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
 
   const isDay0 = selectedDay === 'day0';
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     const [h, m] = startTime.split(':').map(Number);
     const startMins = h * 60 + m;
     const dateForIso = sessionDate || DAYS.find(d => d.id === selectedDay)?.full;
@@ -266,8 +268,13 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       start_time: minutesToIso(dateForIso, startMins),
       end_time: minutesToIso(dateForIso, startMins + duration),
     };
-    onSave(session);
-    onClose();
+    setSaving(true);
+    try {
+      const savedSession = await onSave(session);
+      if (savedSession) onClose();
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (readOnly && editingSession) {
@@ -768,9 +775,9 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
           )}
         </div>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={onClose} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 16px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit' }}>{readOnly ? 'Close' : 'Cancel'}</button>
-          {!readOnly && <button onClick={handleSave} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '8px 20px', color: '#fff', cursor: 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold' }}>
-            {editingSession ? 'Save Changes' : 'Create Session'}
+          <button onClick={onClose} disabled={saving} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 16px', color: 'rgba(240,240,240,0.4)', cursor: saving ? 'default' : 'pointer', fontSize: '12px', fontFamily: 'inherit', opacity: saving ? 0.5 : 1 }}>{readOnly ? 'Close' : 'Cancel'}</button>
+          {!readOnly && <button onClick={handleSave} disabled={saving} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '8px 20px', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontSize: '12px', fontFamily: 'inherit', fontWeight: 'bold', opacity: saving ? 0.7 : 1 }}>
+            {saving ? 'Saving…' : editingSession ? 'Save Changes' : 'Create Session'}
           </button>}
         </div>
       </div>
@@ -2059,15 +2066,25 @@ function NerdConPlanner() {
         invite_only: session.invite_only || false,
       };
       if (session.capacity !== null && session.capacity !== undefined) payload.capacity = session.capacity;
-      payload.id = session.id || crypto.randomUUID();
-      const { data, error } = await supabase.from('sessions').upsert(payload).select();
+      const result = session.id
+        ? await supabase.from('sessions').update(payload).eq('id', session.id).select().single()
+        : await supabase.from('sessions').insert({ ...payload, id: crypto.randomUUID() }).select().single();
+      const { data: saved, error } = result;
       if (error) throw error;
+      if (!saved) throw new Error('The database did not return the saved session.');
+      if (saved.status !== payload.status) {
+        throw new Error(`The session status was not saved (expected ${payload.status}, received ${saved.status}).`);
+      }
       setSessions(prev => {
-        const saved = data[0];
         const exists = prev.find(s => s.id === saved.id);
         return exists ? prev.map(s => s.id === saved.id ? saved : s) : [...prev, saved];
       });
-    } catch (e) { console.error('Save error:', e); alert(`Failed to save: ${e.message || JSON.stringify(e)}`); }
+      return saved;
+    } catch (e) {
+      console.error('Save error:', e);
+      alert(`Failed to save: ${e.message || JSON.stringify(e)}`);
+      return null;
+    }
   };
 
   const handleDelete = async (id) => {
