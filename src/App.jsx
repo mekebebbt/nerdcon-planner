@@ -96,6 +96,7 @@ const labelStyle = { display: 'block', color: 'rgba(240,240,240,0.4)', fontSize:
 function AgendaImageUploader({ label, hint, value, onChange, assetType, sessionId }) {
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
+  const isHeadshot = assetType === 'speaker-headshots';
 
   const handleFile = async (event) => {
     const file = event.target.files?.[0];
@@ -145,12 +146,12 @@ function AgendaImageUploader({ label, hint, value, onChange, assetType, sessionI
         background: 'rgb(18,18,18)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
       }}>
         <div style={{
-          width: assetType === 'event-images' ? '72px' : '112px', height: '72px', flexShrink: 0,
+          width: assetType === 'sponsor-logos' ? '112px' : '72px', height: '72px', flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', background: '#fff',
+          border: '1px solid rgba(255,255,255,0.08)', borderRadius: isHeadshot ? '50%' : '4px', background: '#fff',
         }}>
           {value ? (
-            <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+            <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: isHeadshot ? 'cover' : 'contain' }} />
           ) : (
             <span style={{ fontSize: '10px', color: '#777', textAlign: 'center', padding: '6px' }}>No image</span>
           )}
@@ -1739,7 +1740,13 @@ function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
 
   const startEdit = (sp) => {
     setEditingId(sp.id);
-    setForm({ name: sp.name || '', title: sp.title || '', company: sp.company || '', linkedin: sp.linkedin || '' });
+    setForm({
+      name: sp.name || '',
+      title: sp.title || '',
+      company: sp.company || '',
+      linkedin: sp.linkedin || '',
+      headshot_url: sp.headshot_url || '',
+    });
   };
 
   const cancelEdit = () => { setEditingId(null); setForm({}); };
@@ -1747,7 +1754,13 @@ function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
   const saveEdit = async () => {
     if (!form.name?.trim()) return;
     setSaving(true);
-    const updates = { name: form.name.trim(), title: form.title.trim() || null, company: form.company.trim() || null, linkedin: form.linkedin.trim() || null };
+    const updates = {
+      name: form.name.trim(),
+      title: form.title.trim() || null,
+      company: form.company.trim() || null,
+      linkedin: form.linkedin.trim() || null,
+      headshot_url: form.headshot_url || null,
+    };
     const { error } = await supabase.from('speakers').update(updates).eq('id', editingId);
     if (error) { alert(error.message); setSaving(false); return; }
     onSpeakersChange(speakers.map(s => s.id === editingId ? { ...s, ...updates } : s));
@@ -1785,6 +1798,16 @@ function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
                     <input value={form.linkedin} onChange={e => setForm({ ...form, linkedin: e.target.value })} placeholder="https://linkedin.com/in/..." style={inputStyle} />
                   </div>
                 </div>
+                <div style={{ marginBottom: '10px' }}>
+                  <AgendaImageUploader
+                    label="Headshot"
+                    hint="Use a square JPG, PNG, or WebP with the face centered. It will be cropped to a circle on the public agenda."
+                    value={form.headshot_url}
+                    onChange={headshot_url => setForm({ ...form, headshot_url })}
+                    assetType="speaker-headshots"
+                    sessionId={editingId}
+                  />
+                </div>
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                   <button onClick={cancelEdit} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '6px 12px', color: 'rgba(240,240,240,0.4)', cursor: 'pointer', fontSize: '11px', fontFamily: 'inherit' }}>Cancel</button>
                   <button onClick={saveEdit} disabled={saving || !form.name?.trim()} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '6px 12px', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontSize: '11px', fontFamily: 'inherit', fontWeight: 'bold' }}>{saving ? 'Saving…' : 'Save'}</button>
@@ -1792,6 +1815,17 @@ function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
               </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{
+                  width: '38px', height: '38px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  overflow: 'hidden', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', color: 'rgba(240,240,240,0.6)',
+                  fontSize: '10px', fontWeight: 700,
+                }}>
+                  {sp.headshot_url ? (
+                    <img src={sp.headshot_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    (sp.name || '?').split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase()
+                  )}
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: '13px', color: 'rgb(240,240,240)', fontWeight: 'bold' }}>{sp.name}</div>
                   <div style={{ fontSize: '11px', color: 'rgba(240,240,240,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
