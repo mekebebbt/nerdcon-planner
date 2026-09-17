@@ -93,6 +93,97 @@ const ModalShell = ({ children, onClose, title, width = '640px' }) => (
 const inputStyle = { width: '100%', background: 'rgb(18,18,18)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', padding: '8px 12px', color: 'rgb(240,240,240)', fontSize: '14px', boxSizing: 'border-box', fontFamily: "'JetBrains Mono', ui-monospace, monospace" };
 const labelStyle = { display: 'block', color: 'rgba(240,240,240,0.4)', fontSize: '11px', letterSpacing: '0.1em', marginBottom: '6px', textTransform: 'uppercase' };
 
+function AgendaImageUploader({ label, hint, value, onChange, assetType, sessionId }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const handleFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose an image file.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Images must be 5 MB or smaller.');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const rawExtension = file.name.split('.').pop() || 'png';
+      const extension = rawExtension.toLowerCase().replace(/[^a-z0-9]/g, '') || 'png';
+      const owner = sessionId || `draft-${uuidv4()}`;
+      const path = `${assetType}/${owner}/${Date.now()}-${uuidv4()}.${extension}`;
+      const { error } = await supabase.storage
+        .from('agenda-assets')
+        .upload(path, file, {
+          cacheControl: '3600',
+          contentType: file.type,
+          upsert: false,
+        });
+      if (error) throw error;
+
+      const { data } = supabase.storage.from('agenda-assets').getPublicUrl(path);
+      if (!data?.publicUrl) throw new Error('The upload completed, but no public URL was returned.');
+      onChange(data.publicUrl);
+    } catch (error) {
+      console.error('Agenda image upload failed:', error);
+      alert(`Image upload failed: ${error.message || error}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <label style={labelStyle}>{label}</label>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '12px', padding: '12px',
+        background: 'rgb(18,18,18)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px',
+      }}>
+        <div style={{
+          width: assetType === 'event-images' ? '72px' : '112px', height: '72px', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+          border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', background: '#fff',
+        }}>
+          {value ? (
+            <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          ) : (
+            <span style={{ fontSize: '10px', color: '#777', textAlign: 'center', padding: '6px' }}>No image</span>
+          )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: '10px', color: 'rgba(240,240,240,0.35)', lineHeight: 1.5, marginBottom: '8px' }}>{hint}</div>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} style={{
+              background: uploading ? 'rgba(53,104,255,0.35)' : '#3568FF', border: 'none', borderRadius: '4px',
+              padding: '7px 12px', color: '#fff', cursor: uploading ? 'wait' : 'pointer',
+              fontSize: '10px', fontFamily: 'inherit', fontWeight: 600, letterSpacing: '0.04em',
+            }}>{uploading ? 'UPLOADING…' : value ? 'REPLACE IMAGE' : 'UPLOAD IMAGE'}</button>
+            {value && (
+              <button type="button" onClick={() => onChange('')} disabled={uploading} style={{
+                background: 'none', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '4px',
+                padding: '7px 12px', color: 'rgba(240,240,240,0.45)', cursor: 'pointer',
+                fontSize: '10px', fontFamily: 'inherit', letterSpacing: '0.04em',
+              }}>REMOVE</button>
+            )}
+          </div>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml"
+          onChange={handleFile}
+          style={{ display: 'none' }}
+        />
+      </div>
+    </div>
+  );
+}
+
 // ── Session Modal ─────────────────────────────────────────────────────────────
 // Helper to normalize speakers from old flat array or new participant model
 const normalizeSpeakers = (speakers) => {
@@ -143,6 +234,9 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [capacity, setCapacity] = useState('');
   const [venue, setVenue] = useState('');
   const [host, setHost] = useState('');
+  const [sponsorName, setSponsorName] = useState('');
+  const [eventImageUrl, setEventImageUrl] = useState('');
+  const [sponsorLogoUrl, setSponsorLogoUrl] = useState('');
   const [inviteOnly, setInviteOnly] = useState(false);
   const [newSpkName, setNewSpkName] = useState('');
   const [newSpkTitle, setNewSpkTitle] = useState('');
@@ -194,6 +288,9 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setCapacity(editingSession.capacity ?? '');
       setVenue(editingSession.venue || '');
       setHost(editingSession.host || '');
+      setSponsorName(editingSession.sponsor_name || '');
+      setEventImageUrl(editingSession.event_image_url || '');
+      setSponsorLogoUrl(editingSession.sponsor_logo_url || '');
       setInviteOnly(editingSession.invite_only || false);
       setSessionDate(editingSession.session_date || DAYS.find(d => d.id === editingSession.day)?.full || '');
       setComments(editingSession.comments || []);
@@ -208,7 +305,8 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setTopics([]); setNotes(''); setDescription('');
       setStageId(prefillStageId || stages[0]?.id || '');
       setSessionDate(DAYS.find(d => d.id === selectedDay)?.full || '');
-      setCapacity(''); setVenue(''); setHost(''); setInviteOnly(false);
+      setCapacity(''); setVenue(''); setHost(''); setSponsorName('');
+      setEventImageUrl(''); setSponsorLogoUrl(''); setInviteOnly(false);
       setComments([]); setCommentText('');
     }
   }, [editingSession, isOpen, stages, prefillStageId, prefillTimeMins]);
@@ -256,13 +354,16 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       ...(editingSession || {}),
       id: editingSession?.id || null,
       title: title || (isDay0 ? 'Activation' : `${format} Session`),
-      status: isBlock ? 'block' : status, format: isDay0 ? null : format, duration_minutes: duration,
+      status: isBlock ? 'block' : isDay0 ? 'confirmed' : status, format: isDay0 ? null : format, duration_minutes: duration,
       speakers: isDay0 ? [] : selectedSpeakers, topics: isDay0 ? [] : topics, notes, description,
       stage_id: isDay0 ? null : stageId, day: derivedDay,
       session_date: sessionDate || null,
       capacity: capacity === '' ? null : Number(capacity),
       venue: isDay0 ? (venue || null) : (editingSession?.venue || null),
       host: isDay0 ? (host || null) : (editingSession?.host || null),
+      sponsor_name: isDay0 ? (sponsorName || null) : (editingSession?.sponsor_name || null),
+      event_image_url: isDay0 ? (eventImageUrl || null) : (editingSession?.event_image_url || null),
+      sponsor_logo_url: isDay0 ? (sponsorLogoUrl || null) : (editingSession?.sponsor_logo_url || null),
       invite_only: isDay0 ? inviteOnly : (editingSession?.invite_only || false),
       type: isDay0 ? 'event' : (editingSession?.type || null),
       start_time: minutesToIso(dateForIso, startMins),
@@ -439,6 +540,28 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
                 <label style={labelStyle}>Host</label>
                 <input value={host} onChange={e => setHost(e.target.value)} placeholder="e.g. Company name" style={inputStyle} />
               </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Sponsor Name</label>
+              <input value={sponsorName} onChange={e => setSponsorName(e.target.value)} placeholder="Optional — used as the sponsor logo alt text" style={inputStyle} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <AgendaImageUploader
+                label="Event Image"
+                hint="Square artwork works best. PNG, JPG, WebP, GIF or SVG; maximum 5 MB."
+                value={eventImageUrl}
+                onChange={setEventImageUrl}
+                assetType="event-images"
+                sessionId={editingSession?.id}
+              />
+              <AgendaImageUploader
+                label="Sponsor Logo"
+                hint="A transparent PNG or SVG works best. This is displayed separately under the description."
+                value={sponsorLogoUrl}
+                onChange={setSponsorLogoUrl}
+                assetType="sponsor-logos"
+                sessionId={editingSession?.id}
+              />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input type="checkbox" checked={inviteOnly} onChange={e => setInviteOnly(e.target.checked)} style={{ accentColor: '#f59e0b', width: '16px', height: '16px' }} />
@@ -1730,6 +1853,16 @@ function ActivationsList({ sessions, selectedDay, onEdit, onNew, isEditor }) {
                   onMouseEnter={e => e.currentTarget.style.borderColor = '#3568FF'}
                   onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
                 >
+                  <div style={{
+                    width: '48px', height: '48px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden', borderRadius: '4px', background: '#fff', border: '1px solid rgba(255,255,255,0.08)',
+                  }}>
+                    {s.event_image_url ? (
+                      <img src={s.event_image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                    ) : (
+                      <span style={{ color: '#777', fontSize: '9px', textAlign: 'center' }}>No art</span>
+                    )}
+                  </div>
                   <div style={{ fontSize: '13px', color: '#3568FF', fontFamily: 'monospace', letterSpacing: '0.03em', minWidth: '110px', flexShrink: 0 }}>
                     {timeLabel}
                   </div>
@@ -1738,6 +1871,7 @@ function ActivationsList({ sessions, selectedDay, onEdit, onNew, isEditor }) {
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', fontSize: '12px', color: 'rgba(240,240,240,0.4)' }}>
                       {s.venue && <span>{'\uD83D\uDCCD'} {s.venue}</span>}
                       {s.host && <span>Hosted by {s.host}</span>}
+                      {s.sponsor_logo_url && <span style={{ color: '#22c55e' }}>Sponsor logo added</span>}
                     </div>
                   </div>
                   {s.invite_only && (
@@ -2063,6 +2197,9 @@ function NerdConPlanner() {
         column_index: session.column_index || 0,
         type: session.type || null, block_type: session.block_type || null,
         venue: session.venue || null, host: session.host || null,
+        sponsor_name: session.sponsor_name || null,
+        event_image_url: session.event_image_url || null,
+        sponsor_logo_url: session.sponsor_logo_url || null,
         invite_only: session.invite_only || false,
       };
       if (session.capacity !== null && session.capacity !== undefined) payload.capacity = session.capacity;
