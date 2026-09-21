@@ -112,6 +112,18 @@ Default is `zone`, so new stages appear in Content Zones unless explicitly set o
 | AI Command Center, Stableverse, Compliance Nerd Corner, The Vault, Agentic Commerce Playground, Bootcamp, Podcast Stage, Meetups | `zone` |
 | Roundtables | `signup` |
 
+## MC assignments
+
+MCs are managed separately from sessions so they can cover a whole portion of a day without creating a fake session on the timeline. The planner's **MCS** button lets an editor assign an existing speaker—or leave the person TBD—to a day, stage, label, and time window.
+
+Public assignments are available from this read-only endpoint:
+
+```
+GET https://nrlonrxyvlfymwjjdvhh.supabase.co/rest/v1/public_mc_assignments?select=*&order=day,stage_sort_order,start_time
+```
+
+Use the same `apikey` and `Authorization` headers listed above. The feed returns the stage, portion label, time window, and linked speaker's name, title, company, and headshot. Internal notes and assignments whose **website and app feeds** checkbox is off are never returned.
+
 ## CSV export
 
 One-command export to CSV (requires `curl` and `jq`):

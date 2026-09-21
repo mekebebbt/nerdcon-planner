@@ -1842,6 +1842,214 @@ function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
   );
 }
 
+// ── Manage MC Assignments Modal ──────────────────────────────────────────────
+function ManageMCsModal({ isOpen, onClose, assignments, speakers, stages, selectedDay, onAssignmentsChange }) {
+  const emptyForm = () => ({
+    id: null,
+    day: selectedDay || 'day1',
+    stage_id: stages.find(stage => /main/i.test(stage.name || ''))?.id || stages[0]?.id || '',
+    speaker_id: '',
+    segment_label: 'Morning',
+    start_time: '08:30',
+    end_time: '12:00',
+    notes: '',
+    public_visible: true,
+  });
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && !editingId) setForm(emptyForm());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, selectedDay, stages.length]);
+
+  if (!isOpen) return null;
+
+  const startNew = () => {
+    setEditingId('new');
+    setForm(emptyForm());
+  };
+
+  const startEdit = (assignment) => {
+    setEditingId(assignment.id);
+    setForm({
+      ...assignment,
+      speaker_id: assignment.speaker_id || '',
+      segment_label: assignment.segment_label || '',
+      start_time: (assignment.start_time || '').slice(0, 5),
+      end_time: (assignment.end_time || '').slice(0, 5),
+      notes: assignment.notes || '',
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(emptyForm());
+  };
+
+  const saveAssignment = async () => {
+    if (!form.day || !form.stage_id || !form.segment_label.trim() || !form.start_time || !form.end_time) {
+      alert('Please add a day, stage, portion label, start time, and end time.');
+      return;
+    }
+    if (form.start_time >= form.end_time) {
+      alert('The end time must be after the start time.');
+      return;
+    }
+
+    setSaving(true);
+    const payload = {
+      day: form.day,
+      stage_id: form.stage_id,
+      speaker_id: form.speaker_id || null,
+      segment_label: form.segment_label.trim(),
+      start_time: form.start_time,
+      end_time: form.end_time,
+      notes: form.notes.trim() || null,
+      public_visible: form.public_visible,
+      updated_at: new Date().toISOString(),
+    };
+    const result = editingId === 'new'
+      ? await supabase.from('mc_assignments').insert(payload).select().single()
+      : await supabase.from('mc_assignments').update(payload).eq('id', editingId).select().single();
+
+    if (result.error) {
+      alert(`Could not save the MC assignment: ${result.error.message}`);
+      setSaving(false);
+      return;
+    }
+
+    onAssignmentsChange(prev => {
+      const exists = prev.some(item => item.id === result.data.id);
+      return exists ? prev.map(item => item.id === result.data.id ? result.data : item) : [...prev, result.data];
+    });
+    setSaving(false);
+    cancelEdit();
+  };
+
+  const deleteAssignment = async (assignment) => {
+    const speaker = speakers.find(item => item.id === assignment.speaker_id);
+    const label = speaker?.name || 'this TBD MC slot';
+    if (!window.confirm(`Remove ${label} from ${assignment.segment_label}?`)) return;
+    const { error } = await supabase.from('mc_assignments').delete().eq('id', assignment.id);
+    if (error) {
+      alert(`Could not remove the MC assignment: ${error.message}`);
+      return;
+    }
+    onAssignmentsChange(prev => prev.filter(item => item.id !== assignment.id));
+    if (editingId === assignment.id) cancelEdit();
+  };
+
+  const sortedSpeakers = [...speakers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const sortedAssignments = [...assignments].sort((a, b) => {
+    const dayDiff = DAYS.findIndex(day => day.id === a.day) - DAYS.findIndex(day => day.id === b.day);
+    if (dayDiff) return dayDiff;
+    const stageA = stages.find(stage => stage.id === a.stage_id)?.sort_order || 0;
+    const stageB = stages.find(stage => stage.id === b.stage_id)?.sort_order || 0;
+    if (stageA !== stageB) return stageA - stageB;
+    return (a.start_time || '').localeCompare(b.start_time || '');
+  });
+
+  return (
+    <ModalShell onClose={onClose} title="MC Assignments" width="780px">
+      <div style={{ padding: '16px 24px 24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', alignItems: 'center', marginBottom: '14px' }}>
+          <div style={{ color: 'rgba(240,240,240,0.5)', fontSize: '11px', lineHeight: 1.5 }}>
+            Assign one MC to each stage portion. Link an existing speaker to reuse their title, company, and headshot.
+          </div>
+          {!editingId && (
+            <button onClick={startNew} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '8px 14px', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: '11px', fontWeight: 700, whiteSpace: 'nowrap' }}>+ ADD MC</button>
+          )}
+        </div>
+
+        {editingId && (
+          <div style={{ border: '1px solid rgba(53,104,255,0.5)', borderRadius: '6px', background: 'rgb(18,18,18)', padding: '16px', marginBottom: '16px' }}>
+            <div style={{ color: '#fff', fontSize: '12px', fontWeight: 700, marginBottom: '14px', letterSpacing: '0.06em' }}>
+              {editingId === 'new' ? 'NEW MC ASSIGNMENT' : 'EDIT MC ASSIGNMENT'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}>
+              <div>
+                <label style={labelStyle}>Day *</label>
+                <select value={form.day} onChange={event => setForm({ ...form, day: event.target.value })} style={inputStyle}>
+                  {DAYS.map(day => <option key={day.id} value={day.id}>{day.label} · {day.date}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Stage *</label>
+                <select value={form.stage_id} onChange={event => setForm({ ...form, stage_id: event.target.value })} style={inputStyle}>
+                  <option value="">Choose a stage</option>
+                  {stages.map(stage => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Portion of day *</label>
+                <input value={form.segment_label} onChange={event => setForm({ ...form, segment_label: event.target.value })} placeholder="Morning, Afternoon, Evening…" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>MC</label>
+                <select value={form.speaker_id} onChange={event => setForm({ ...form, speaker_id: event.target.value })} style={inputStyle}>
+                  <option value="">TBD — assign later</option>
+                  {sortedSpeakers.map(speaker => <option key={speaker.id} value={speaker.id}>{speaker.name}{speaker.company ? ` · ${speaker.company}` : ''}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={labelStyle}>Starts *</label>
+                <input type="time" value={form.start_time} onChange={event => setForm({ ...form, start_time: event.target.value })} style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Ends *</label>
+                <input type="time" value={form.end_time} onChange={event => setForm({ ...form, end_time: event.target.value })} style={inputStyle} />
+              </div>
+            </div>
+            <div style={{ marginTop: '12px' }}>
+              <label style={labelStyle}>Internal notes</label>
+              <textarea value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })} placeholder="Handover notes, responsibilities, contact details…" style={{ ...inputStyle, minHeight: '72px', resize: 'vertical' }} />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'rgba(240,240,240,0.7)', fontSize: '11px', marginTop: '12px', cursor: 'pointer' }}>
+              <input type="checkbox" checked={form.public_visible} onChange={event => setForm({ ...form, public_visible: event.target.checked })} />
+              Make this MC available to the website and app feeds
+            </label>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+              <button onClick={cancelEdit} disabled={saving} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '4px', padding: '7px 13px', color: 'rgba(240,240,240,0.6)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '11px' }}>Cancel</button>
+              <button onClick={saveAssignment} disabled={saving} style={{ background: '#3568FF', border: 'none', borderRadius: '4px', padding: '7px 13px', color: '#fff', cursor: saving ? 'wait' : 'pointer', fontFamily: 'inherit', fontSize: '11px', fontWeight: 700 }}>{saving ? 'Saving…' : 'Save MC'}</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ maxHeight: '52vh', overflowY: 'auto' }}>
+          {sortedAssignments.length === 0 ? (
+            <div style={{ border: '1px dashed rgba(255,255,255,0.12)', borderRadius: '6px', color: 'rgba(240,240,240,0.4)', fontSize: '12px', textAlign: 'center', padding: '32px 16px' }}>
+              No MC portions yet. Add the first one when you are ready—even if the MC is still TBD.
+            </div>
+          ) : sortedAssignments.map(assignment => {
+            const speaker = speakers.find(item => item.id === assignment.speaker_id);
+            const stage = stages.find(item => item.id === assignment.stage_id);
+            const day = DAYS.find(item => item.id === assignment.day);
+            return (
+              <div key={assignment.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '11px 12px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '5px', background: 'rgb(18,18,18)', marginBottom: '7px' }}>
+                <div style={{ width: '42px', height: '42px', flexShrink: 0, borderRadius: '50%', overflow: 'hidden', background: 'rgba(255,255,255,0.08)', color: 'rgba(240,240,240,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700 }}>
+                  {speaker?.headshot_url ? <img src={speaker.headshot_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : speaker ? speaker.name.split(/\s+/).map(part => part[0]).join('').slice(0, 2).toUpperCase() : 'TBD'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#fff', fontSize: '13px', fontWeight: 700 }}>{speaker?.name || 'MC TBD'}</div>
+                  <div style={{ color: 'rgba(240,240,240,0.48)', fontSize: '10px', marginTop: '3px' }}>
+                    {day?.label} · {stage?.name || 'Unknown stage'} · {assignment.segment_label} · {(assignment.start_time || '').slice(0, 5)}–{(assignment.end_time || '').slice(0, 5)}
+                  </div>
+                  {speaker && (speaker.title || speaker.company) && <div style={{ color: 'rgba(240,240,240,0.32)', fontSize: '10px', marginTop: '2px' }}>{[speaker.title, speaker.company].filter(Boolean).join(' · ')}</div>}
+                </div>
+                {!assignment.public_visible && <span style={{ color: '#f59e0b', border: '1px solid #f59e0b55', borderRadius: '3px', fontSize: '9px', padding: '3px 6px' }}>INTERNAL</span>}
+                <button onClick={() => startEdit(assignment)} style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '3px', color: '#3568FF', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '10px' }}>Edit</button>
+                <button onClick={() => deleteAssignment(assignment)} style={{ background: 'transparent', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '3px', color: '#ef4444', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '10px' }}>Remove</button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
 // ── Day 0 Activations List ────────────────────────────────────────────────────
 function ActivationsList({ sessions, selectedDay, onEdit, onNew, isEditor }) {
   const activations = sessions
@@ -2173,6 +2381,7 @@ function NerdConPlanner() {
   const [sessions, setSessions] = useState([]);
   const [speakers, setSpeakers] = useState([]);
   const [stages, setStages] = useState([]);
+  const [mcAssignments, setMcAssignments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState('day1');
   const [showModal, setShowModal] = useState(false);
@@ -2186,6 +2395,7 @@ function NerdConPlanner() {
   const [prefillTimeMins, setPrefillTimeMins] = useState(null);
   const [showRegistrations, setShowRegistrations] = useState(false);
   const [showSpeakersModal, setShowSpeakersModal] = useState(false);
+  const [showMCsModal, setShowMCsModal] = useState(false);
   const [ignoredClashes, setIgnoredClashes] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem('nerdcon-ignored-clashes') || '[]')); }
     catch { return new Set(); }
@@ -2207,14 +2417,16 @@ function NerdConPlanner() {
       // Clean up obsolete stage-closed blocks (stage-open/close are valid operational markers)
       await supabase.from('sessions').delete().in('block_type', ['stage-closed']);
 
-      const [sessRes, spRes, stRes] = await Promise.all([
+      const [sessRes, spRes, stRes, mcRes] = await Promise.all([
         supabase.from('sessions').select('*'),
         supabase.from('speakers').select('*'),
         supabase.from('stages').select('*').order('sort_order'),
+        supabase.from('mc_assignments').select('*').order('day').order('stage_id').order('start_time'),
       ]);
       if (sessRes.data) setSessions(sessRes.data);
       if (spRes.data) setSpeakers(spRes.data);
       if (stRes.data) setStages(stRes.data);
+      if (mcRes.data) setMcAssignments(mcRes.data);
     } catch (e) { console.error(e); }
     setLoading(false);
   };
@@ -2432,6 +2644,7 @@ function NerdConPlanner() {
           ))}
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {isEditor && <button onClick={() => setShowMCsModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>MCS{mcAssignments.length ? ` (${mcAssignments.length})` : ''}</button>}
           {isEditor && <button onClick={() => setShowSpeakersModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>SPEAKERS</button>}
           {isEditor && <button onClick={() => setShowRegistrations(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>SIGNUPS</button>}
           {isEditor && <button onClick={() => setShowStagesModal(true)} style={{ background: 'transparent', border: `1px solid ${BV.cockpitLine}`, color: '#D4D6DC', borderRadius: '7px', padding: '8px 13px', cursor: 'pointer', fontFamily: BV.mono, fontSize: '11px', letterSpacing: '0.5px', transition: '.12s', display: 'flex', gap: '6px', alignItems: 'center' }}>STAGES</button>}
@@ -2608,6 +2821,8 @@ function NerdConPlanner() {
         onCommentsChange={(sessionId, updated) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, comments: updated } : s))} />
 
       <ManageSpeakersModal isOpen={showSpeakersModal} onClose={() => setShowSpeakersModal(false)} speakers={speakers} onSpeakersChange={setSpeakers} />
+
+      <ManageMCsModal isOpen={showMCsModal} onClose={() => setShowMCsModal(false)} assignments={mcAssignments} speakers={speakers} stages={stages} selectedDay={selectedDay} onAssignmentsChange={setMcAssignments} />
 
       <ManageStagesModal isOpen={showStagesModal} onClose={() => setShowStagesModal(false)} stages={stages} onStagesChange={setStages} />
 
