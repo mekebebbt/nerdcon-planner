@@ -1414,10 +1414,11 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
 
 // ── Roundtables Section ───────────────────────────────────────────────────────
 const RT_TIME_BLOCKS = [
-  { start: 14 * 60, end: 14 * 60 + 40, label: 'Block 1' },
-  { start: 14 * 60 + 45, end: 15 * 60 + 25, label: 'Block 2' },
-  { start: 15 * 60 + 30, end: 16 * 60 + 10, label: 'Block 3' },
-  { start: 16 * 60 + 15, end: 16 * 60 + 55, label: 'Block 4' },
+  { start: 12 * 60 + 15, end: 12 * 60 + 55, label: 'Block 1' },
+  { start: 13 * 60, end: 13 * 60 + 40, label: 'Block 2' },
+  { start: 13 * 60 + 45, end: 14 * 60 + 25, label: 'Block 3' },
+  { start: 14 * 60 + 30, end: 15 * 60 + 10, label: 'Block 4' },
+  { start: 15 * 60 + 15, end: 15 * 60 + 55, label: 'Block 5' },
 ];
 
 function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragStart, onEditSession, handleDrop, handleSave, dropError, dragSessionRef, openNewSession, isEditor }) {
@@ -1433,7 +1434,7 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
         <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: stage.color, flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: '13px', fontWeight: 'bold', color: stage.color, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: BV.sans }}>{stage.name}</div>
-          <div style={{ fontSize: '10px', color: BV.inkFaint }}>4 time blocks · {maxCols} parallel slots each</div>
+          <div style={{ fontSize: '10px', color: BV.inkFaint }}>{RT_TIME_BLOCKS.length} time blocks · {maxCols} parallel slots each</div>
         </div>
       </div>
 
