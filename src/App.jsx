@@ -1732,10 +1732,16 @@ function RegistrationsModal({ isOpen, onClose, sessions, stages }) {
 }
 
 // ── Manage Speakers Modal ─────────────────────────────────────────────────────
-function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
+function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange, onDeleteSpeaker }) {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [notice, setNotice] = useState('');
+  const deleteInFlight = useRef(false);
 
   if (!isOpen) return null;
 
@@ -1770,13 +1776,55 @@ function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
     setSaving(false);
   };
 
-  const sorted = [...speakers].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleteInFlight.current) return;
+    deleteInFlight.current = true;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await onDeleteSpeaker(deleteTarget.id);
+      setNotice(`${deleteTarget.name} was deleted.`);
+      setDeleteTarget(null);
+      if (editingId === deleteTarget.id) cancelEdit();
+    } catch (error) {
+      setDeleteError(`Could not delete ${deleteTarget.name}: ${error.message || 'Please try again.'}`);
+    } finally {
+      deleteInFlight.current = false;
+      setDeleting(false);
+    }
+  };
+
+  const query = search.trim().toLowerCase();
+  const sorted = speakers.filter(sp =>
+    [sp.name, sp.company, sp.title].filter(Boolean).join(' ').toLowerCase().includes(query)
+  ).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
   return (
-    <ModalShell onClose={onClose} title="Speakers" width="640px">
+    <ModalShell onClose={() => { if (!deleting) onClose(); }} title="Speakers" width="640px">
+      <div style={{ padding: '16px 24px 0' }}>
+        <label htmlFor="speaker-search" style={labelStyle}>Search speakers</label>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input id="speaker-search" type="search" placeholder="Search by name, company, or title…" value={search} onChange={e => setSearch(e.target.value)} style={inputStyle} />
+          {search && <button onClick={() => setSearch('')} style={{ background: 'none', border: 'none', color: '#91AEFF', cursor: 'pointer', fontFamily: 'inherit' }}>Clear</button>}
+        </div>
+        <div role="status" style={{ color: 'rgba(240,240,240,0.6)', fontSize: '11px', marginTop: '10px' }}>
+          {query ? `${sorted.length} of ${speakers.length} speakers` : `${speakers.length} speakers`}{notice && ` · ${notice}`}
+        </div>
+        {deleteTarget && (
+          <div role="alertdialog" aria-modal="false" aria-labelledby="delete-speaker-title" aria-describedby="delete-speaker-description" style={{ marginTop: '14px', padding: '14px', border: '1px solid #A84040', borderRadius: '4px', background: '#291616' }}>
+            <div id="delete-speaker-title" style={{ color: '#fff', fontSize: '13px', fontWeight: 'bold' }}>Delete {deleteTarget.name}?</div>
+            <p id="delete-speaker-description" style={{ color: '#E3C5C5', fontSize: '12px', lineHeight: 1.6 }}>This permanently removes this speaker and their links to all sessions. Sessions stay in the agenda, and any MC slots assigned to them become TBD. This cannot be undone.</p>
+            {deleteError && <p role="alert" style={{ color: '#FFAAAA', fontSize: '12px' }}>{deleteError}</p>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+              <button autoFocus disabled={deleting} onClick={() => { setDeleteTarget(null); setDeleteError(''); }} style={{ ...inputStyle, width: 'auto', cursor: 'pointer', fontSize: '12px' }}>Cancel</button>
+              <button disabled={deleting} onClick={confirmDelete} style={{ ...inputStyle, width: 'auto', background: '#B63131', cursor: deleting ? 'wait' : 'pointer', fontSize: '12px' }}>{deleting ? 'Deleting…' : 'Delete speaker'}</button>
+            </div>
+          </div>
+        )}
+      </div>
       <div style={{ padding: '16px 24px', maxHeight: '60vh', overflowY: 'auto' }}>
         {sorted.length === 0 ? (
-          <div style={{ color: 'rgba(240,240,240,0.4)', fontSize: '12px', textAlign: 'center', padding: '24px 0' }}>No speakers yet.</div>
+          <div style={{ color: 'rgba(240,240,240,0.6)', fontSize: '12px', textAlign: 'center', padding: '24px 0' }}>{query ? 'No speakers match your search.' : 'No speakers yet.'}</div>
         ) : sorted.map(sp => (
           <div key={sp.id} style={{ border: '1px solid rgba(255,255,255,0.08)', borderRadius: '4px', marginBottom: '6px', background: 'rgb(18,18,18)', padding: '10px 12px' }}>
             {editingId === sp.id ? (
@@ -1833,7 +1881,8 @@ function ManageSpeakersModal({ isOpen, onClose, speakers, onSpeakersChange }) {
                     {[sp.title, sp.company].filter(Boolean).join(' · ') || '—'}
                   </div>
                 </div>
-                <button onClick={() => startEdit(sp)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '3px', padding: '3px 8px', color: '#3568FF', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit', flexShrink: 0 }}>Edit</button>
+                <button disabled={deleting || saving || !!deleteTarget} onClick={() => startEdit(sp)} style={{ background: 'none', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '3px', padding: '3px 8px', color: '#3568FF', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit', flexShrink: 0 }}>Edit</button>
+                <button aria-label={`Delete ${sp.name}`} disabled={deleting || saving || !!editingId || !!deleteTarget} onClick={() => { setDeleteTarget(sp); setDeleteError(''); setNotice(''); }} style={{ background: 'none', border: '1px solid rgba(255,100,100,0.3)', borderRadius: '3px', padding: '3px 8px', color: '#FF9999', cursor: 'pointer', fontSize: '10px', fontFamily: 'inherit', flexShrink: 0 }}>Delete</button>
               </div>
             )}
           </div>
@@ -2432,6 +2481,15 @@ function NerdConPlanner() {
     setLoading(false);
   };
 
+  const handleDeleteSpeaker = async (speakerId) => {
+    if (!isEditor) throw new Error('Only editors can delete speakers.');
+    const { data: updatedSessions, error } = await supabase.rpc('delete_planner_speaker', { target_speaker_id: speakerId });
+    if (error) throw error;
+    setSpeakers(prev => prev.filter(speaker => speaker.id !== speakerId));
+    setSessions(prev => prev.map(session => updatedSessions.find(updated => updated.id === session.id) || session));
+    setMcAssignments(prev => prev.map(assignment => assignment.speaker_id === speakerId ? { ...assignment, speaker_id: null } : assignment));
+  };
+
   const handleSave = async (session) => {
     try {
       const payload = {
@@ -2821,7 +2879,7 @@ function NerdConPlanner() {
         prefillStageId={prefillStageId} prefillTimeMins={prefillTimeMins}
         onCommentsChange={(sessionId, updated) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, comments: updated } : s))} />
 
-      <ManageSpeakersModal isOpen={showSpeakersModal} onClose={() => setShowSpeakersModal(false)} speakers={speakers} onSpeakersChange={setSpeakers} />
+      {showSpeakersModal && <ManageSpeakersModal isOpen onClose={() => setShowSpeakersModal(false)} speakers={speakers} onSpeakersChange={setSpeakers} onDeleteSpeaker={handleDeleteSpeaker} />}
 
       <ManageMCsModal isOpen={showMCsModal} onClose={() => setShowMCsModal(false)} assignments={mcAssignments} speakers={speakers} stages={stages} selectedDay={selectedDay} onAssignmentsChange={setMcAssignments} />
 
