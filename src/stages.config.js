@@ -9,6 +9,7 @@ export const TOPIC_TAGS = [
   "Credit", "Insurance", "Wealth Management", "Digital Assets", "Cross-Border",
   "Emerging Markets", "B2B Fintech", "Consumer Fintech", "Infrastructure",
   "Data & Analytics", "Policy & Regulation", "Investment & VC",
+  "Regulation", "Product & Engineering", "Digital Banking", "International Expansion", "Mortgages", "Business Banking", "Bank Charters", "Product Strategy",
 ];
 
 export const TOPIC_TAG_COLORS = {
@@ -36,6 +37,14 @@ export const TOPIC_TAG_COLORS = {
   "Data & Analytics": "#2563eb",
   "Policy & Regulation": "#ea580c",
   "Investment & VC": "#b45309",
+  "Regulation": "#ea580c",
+  "Product & Engineering": "#2563eb",
+  "Digital Banking": "#f59e0b",
+  "International Expansion": "#0ea5e9",
+  "Mortgages": "#f97316",
+  "Business Banking": "#f59e0b",
+  "Bank Charters": "#ea580c",
+  "Product Strategy": "#64748b",
 };
 
 export const FORMAT_TAGS = [
