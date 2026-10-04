@@ -2659,7 +2659,7 @@ function NerdConPlanner() {
   const halls = useMemo(() => {
     const map = {};
     stages.filter(s => (s.max_columns || 1) === 1).forEach(s => {
-      if (!map[s.hall_id]) map[s.hall_id] = { id: s.hall_id, name: s.hall_name, stages: [] };
+      if (!map[s.hall_id]) map[s.hall_id] = { id: s.hall_id, name: s.hall_name || 'Unassigned hall', stages: [] };
       map[s.hall_id].stages.push(s);
     });
     return Object.values(map).filter(h => h.stages.length > 0);
