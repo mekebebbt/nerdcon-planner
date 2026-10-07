@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, createContext, useContext 
 import { createClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import { TOPIC_TAGS, TOPIC_TAG_COLORS, FORMAT_TAGS } from './stages.config.js';
+import { isOfficeHours, isTimetableStage, parallelTimeBlocks } from './agenda-layout.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -219,7 +220,7 @@ const getSeatDisplay = (sessionSpeakers, speakersArr, allSpeakers) => {
   return seats;
 };
 
-function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded, clashInfo, isIgnored, onToggleIgnore, readOnly, onCommentsChange, prefillStageId, prefillTimeMins }) {
+function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speakers, stages, selectedDay, onSpeakerAdded, clashInfo, isIgnored, onToggleIgnore, readOnly, onCommentsChange, prefillStageId, prefillTimeMins, prefillColumnIndex }) {
   const { user: authUser, profile, role } = useContext(AuthContext);
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('placeholder');
@@ -298,8 +299,10 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setCommentText('');
       if (editingSession.start_time) setStartTime(formatTime24(isoToMinutes(editingSession.start_time)));
     } else {
-      setTitle(''); setStatus('placeholder'); setFormat('Panel');
-      setDuration(30);
+      setTitle(''); setStatus('placeholder');
+      const officeHours = isOfficeHours(stages.find(s => s.id === prefillStageId));
+      setFormat(officeHours ? 'Office Hours' : 'Panel');
+      setDuration(officeHours ? 60 : 30);
       setStartTime(prefillTimeMins != null ? formatTime24(prefillTimeMins) : '09:00');
       setSelectedSpeakers([]); setSpeakerSearch('');
       setCompanyInput(''); setGuestInput(''); setShowAddPlaceholder(false);
@@ -310,7 +313,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setEventImageUrl(''); setSponsorLogoUrl(''); setInviteOnly(false);
       setComments([]); setCommentText('');
     }
-  }, [editingSession, isOpen, stages, prefillStageId, prefillTimeMins]);
+  }, [editingSession, isOpen, stages, prefillStageId, prefillTimeMins, selectedDay]);
 
   const handlePostComment = async () => {
     if (!commentText.trim() || !editingSession?.id || postingComment) return;
@@ -358,6 +361,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       status: isBlock ? 'block' : isDay0 ? 'confirmed' : status, format: isDay0 ? null : format, duration_minutes: duration,
       speakers: isDay0 ? [] : selectedSpeakers, topics: isDay0 ? [] : topics, notes, description,
       stage_id: isDay0 ? null : stageId, day: derivedDay,
+      column_index: editingSession?.column_index ?? prefillColumnIndex ?? 0,
       session_date: sessionDate || null,
       capacity: capacity === '' ? null : Number(capacity),
       venue: isDay0 ? (venue || null) : (editingSession?.venue || null),
@@ -1413,16 +1417,10 @@ function SlotColumn({ stage, stageSessions, speakers, openFrom, openUntil, colIn
 }
 
 // ── Roundtables Section ───────────────────────────────────────────────────────
-const RT_TIME_BLOCKS = [
-  { start: 12 * 60 + 15, end: 12 * 60 + 55, label: 'Block 1' },
-  { start: 13 * 60, end: 13 * 60 + 40, label: 'Block 2' },
-  { start: 13 * 60 + 45, end: 14 * 60 + 25, label: 'Block 3' },
-  { start: 14 * 60 + 30, end: 15 * 60 + 10, label: 'Block 4' },
-  { start: 15 * 60 + 15, end: 15 * 60 + 55, label: 'Block 5' },
-];
 
 function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragStart, onEditSession, handleDrop, handleSave, dropError, dragSessionRef, openNewSession, isEditor }) {
   const maxCols = stage.max_columns || 5;
+  const timeBlocks = parallelTimeBlocks(stage);
   const allStageSessions = daySessions.filter(s => s.stage_id === stage.id && s.start_time);
 
   const RT_CARD_WIDTH = 240;
@@ -1434,12 +1432,12 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
         <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: stage.color, flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: '13px', fontWeight: 'bold', color: stage.color, letterSpacing: '0.1em', textTransform: 'uppercase', fontFamily: BV.sans }}>{stage.name}</div>
-          <div style={{ fontSize: '10px', color: BV.inkFaint }}>{RT_TIME_BLOCKS.length} time blocks · {maxCols} parallel slots each</div>
+          <div style={{ fontSize: '10px', color: BV.inkFaint }}>{timeBlocks.length} time blocks · {maxCols} parallel slots each</div>
         </div>
       </div>
 
       {/* Fixed time blocks */}
-      {RT_TIME_BLOCKS.map((block, blockIdx) => {
+      {timeBlocks.map((block, blockIdx) => {
         const blockDuration = block.end - block.start;
         const blockSessions = allStageSessions.filter(s => {
           const mins = isoToMinutes(s.start_time);
@@ -1524,7 +1522,7 @@ function RoundtablesSection({ stage, daySessions, speakers, selectedDay, onDragS
                     onDragEnter={isEditor ? e => { e.preventDefault(); e.currentTarget.style.borderColor = stage.color; e.currentTarget.style.background = BV.paperLineSoft; } : undefined}
                     onDragLeave={isEditor ? e => { e.currentTarget.style.borderColor = BV.paperLine; e.currentTarget.style.background = 'transparent'; } : undefined}
                     onDrop={isEditor ? e => { e.preventDefault(); e.currentTarget.style.borderColor = BV.paperLine; e.currentTarget.style.background = 'transparent'; handleDrop(stage.id, block.start, colIdx); } : undefined}
-                    onClick={isEditor ? () => openNewSession(stage.id, block.start) : undefined}
+                    onClick={isEditor ? () => openNewSession(stage.id, block.start, colIdx) : undefined}
                     style={{
                       width: `${RT_CARD_WIDTH}px`, padding: '10px 12px', borderRadius: '4px',
                       border: `1px dashed ${BV.paperLine}`, cursor: isEditor ? 'cell' : 'default',
@@ -2239,7 +2237,7 @@ function EveningEventsSection({ sessions, selectedDay, onEdit }) {
 
 // ── Capacity Rail ────────────────────────────────────────────────────────────
 function CapacityRail({ stages, daySessions, selectedDay }) {
-  const mainStages = stages.filter(s => (s.max_columns || 1) === 1);
+  const mainStages = stages.filter(s => isTimetableStage(s) && (s.max_columns || 1) === 1);
   if (mainStages.length === 0) return null;
 
   const caps = mainStages.map(stage => {
@@ -2443,6 +2441,7 @@ function NerdConPlanner() {
   const [pendingBlock, setPendingBlock] = useState(null);
   const [prefillStageId, setPrefillStageId] = useState(null);
   const [prefillTimeMins, setPrefillTimeMins] = useState(null);
+  const [prefillColumnIndex, setPrefillColumnIndex] = useState(0);
   const [showRegistrations, setShowRegistrations] = useState(false);
   const [showSpeakersModal, setShowSpeakersModal] = useState(false);
   const [showMCsModal, setShowMCsModal] = useState(false);
@@ -2536,9 +2535,10 @@ function NerdConPlanner() {
     } catch (e) { console.error(e); }
   };
 
-  const openNewSession = (stageId, timeMins) => {
+  const openNewSession = (stageId, timeMins, colIndex = 0) => {
     if (!isEditor) return;
     setPrefillStageId(stageId || null);
+    setPrefillColumnIndex(colIndex);
     setPrefillTimeMins(timeMins != null ? timeMins : null);
     setEditingSession(null);
     setShowModal(true);
@@ -2570,8 +2570,15 @@ function NerdConPlanner() {
       return;
     }
 
+    const duration = isOfficeHours(targetStage) ? 60 : session.duration_minutes;
+    if (targetStage && slotMins + duration > parseTime(targetStage.open_until)) {
+      setDropError({ stageId, slotMins, colIndex });
+      setTimeout(() => setDropError(null), 1200);
+      return;
+    }
+
     // Overlap check
-    if (checkOverlap(sessions, stageId, selectedDay, slotMins, session.duration_minutes, session.id, colIndex)) {
+    if (checkOverlap(sessions, stageId, selectedDay, slotMins, duration, session.id, colIndex)) {
       setDropError({ stageId, slotMins, colIndex });
       setTimeout(() => setDropError(null), 800);
       return;
@@ -2579,8 +2586,10 @@ function NerdConPlanner() {
 
     await handleSave({
       ...session, stage_id: stageId, day: selectedDay, column_index: colIndex,
+      duration_minutes: duration,
+      ...(isOfficeHours(targetStage) ? { format: 'Office Hours' } : {}),
       start_time: minutesToIso(dayDate, slotMins),
-      end_time: minutesToIso(dayDate, slotMins + session.duration_minutes),
+      end_time: minutesToIso(dayDate, slotMins + duration),
     });
   };
 
@@ -2658,7 +2667,7 @@ function NerdConPlanner() {
 
   const halls = useMemo(() => {
     const map = {};
-    stages.filter(s => (s.max_columns || 1) === 1).forEach(s => {
+    stages.filter(s => isTimetableStage(s) && (s.max_columns || 1) === 1).forEach(s => {
       if (!map[s.hall_id]) map[s.hall_id] = { id: s.hall_id, name: s.hall_name || 'Unassigned hall', stages: [] };
       map[s.hall_id].stages.push(s);
     });
@@ -2876,7 +2885,7 @@ function NerdConPlanner() {
         clashInfo={editingSession ? speakerClashes[editingSession.id] : null}
         isIgnored={editingSession ? ignoredClashes.has(editingSession.id) : false}
         onToggleIgnore={toggleIgnoreClash} readOnly={!isEditor}
-        prefillStageId={prefillStageId} prefillTimeMins={prefillTimeMins}
+        prefillStageId={prefillStageId} prefillTimeMins={prefillTimeMins} prefillColumnIndex={prefillColumnIndex}
         onCommentsChange={(sessionId, updated) => setSessions(prev => prev.map(s => s.id === sessionId ? { ...s, comments: updated } : s))} />
 
       {showSpeakersModal && <ManageSpeakersModal isOpen onClose={() => setShowSpeakersModal(false)} speakers={speakers} onSpeakersChange={setSpeakers} onDeleteSpeaker={handleDeleteSpeaker} />}
