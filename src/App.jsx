@@ -239,6 +239,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
   const [sponsorName, setSponsorName] = useState('');
   const [eventImageUrl, setEventImageUrl] = useState('');
   const [sponsorLogoUrl, setSponsorLogoUrl] = useState('');
+  const [signupUrl, setSignupUrl] = useState('');
   const [inviteOnly, setInviteOnly] = useState(false);
   const [newSpkName, setNewSpkName] = useState('');
   const [newSpkTitle, setNewSpkTitle] = useState('');
@@ -293,6 +294,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setSponsorName(editingSession.sponsor_name || '');
       setEventImageUrl(editingSession.event_image_url || '');
       setSponsorLogoUrl(editingSession.sponsor_logo_url || '');
+      setSignupUrl(editingSession.signup_url || '');
       setInviteOnly(editingSession.invite_only || false);
       setSessionDate(editingSession.session_date || DAYS.find(d => d.id === editingSession.day)?.full || '');
       setComments(editingSession.comments || []);
@@ -310,7 +312,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       setStageId(prefillStageId || stages[0]?.id || '');
       setSessionDate(DAYS.find(d => d.id === selectedDay)?.full || '');
       setCapacity(''); setVenue(''); setHost(''); setSponsorName('');
-      setEventImageUrl(''); setSponsorLogoUrl(''); setInviteOnly(false);
+      setEventImageUrl(''); setSponsorLogoUrl(''); setSignupUrl(''); setInviteOnly(false);
       setComments([]); setCommentText('');
     }
   }, [editingSession, isOpen, stages, prefillStageId, prefillTimeMins, selectedDay]);
@@ -350,6 +352,16 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
 
   const handleSave = async () => {
     if (saving) return;
+    const trimmedSignupUrl = signupUrl.trim();
+    if (isDay0 && trimmedSignupUrl) {
+      try {
+        const parsedSignupUrl = new URL(trimmedSignupUrl);
+        if (!['http:', 'https:'].includes(parsedSignupUrl.protocol)) throw new Error('Unsupported protocol');
+      } catch {
+        alert('Signup link must be a complete http:// or https:// URL.');
+        return;
+      }
+    }
     const [h, m] = startTime.split(':').map(Number);
     const startMins = h * 60 + m;
     const dateForIso = sessionDate || DAYS.find(d => d.id === selectedDay)?.full;
@@ -369,6 +381,7 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
       sponsor_name: isDay0 ? (sponsorName || null) : (editingSession?.sponsor_name || null),
       event_image_url: isDay0 ? (eventImageUrl || null) : (editingSession?.event_image_url || null),
       sponsor_logo_url: isDay0 ? (sponsorLogoUrl || null) : (editingSession?.sponsor_logo_url || null),
+      signup_url: isDay0 ? (trimmedSignupUrl || null) : (editingSession?.signup_url || null),
       invite_only: isDay0 ? inviteOnly : (editingSession?.invite_only || false),
       type: isDay0 ? 'event' : (editingSession?.type || null),
       start_time: minutesToIso(dateForIso, startMins),
@@ -549,6 +562,22 @@ function SessionModal({ isOpen, onClose, onSave, onDelete, editingSession, speak
             <div>
               <label style={labelStyle}>Sponsor Name</label>
               <input value={sponsorName} onChange={e => setSponsorName(e.target.value)} placeholder="Optional — used as the sponsor logo alt text" style={inputStyle} />
+            </div>
+            <div>
+              <label style={labelStyle}>Signup Link</label>
+              <input
+                type="url"
+                value={signupUrl}
+                onChange={e => setSignupUrl(e.target.value)}
+                placeholder="https://..."
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                style={inputStyle}
+              />
+              <div style={{ marginTop: '6px', color: 'rgba(240,240,240,0.35)', fontSize: '10px', lineHeight: 1.4 }}>
+                When added, the public Day 0 card shows a Sign up button instead of an agenda action.
+              </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
               <AgendaImageUploader
@@ -2162,6 +2191,7 @@ function ActivationsList({ sessions, selectedDay, onEdit, onNew, isEditor }) {
                       {s.venue && <span>{'\uD83D\uDCCD'} {s.venue}</span>}
                       {s.host && <span>Hosted by {s.host}</span>}
                       {s.sponsor_logo_url && <span style={{ color: '#22c55e' }}>Sponsor logo added</span>}
+                      {s.signup_url && <span style={{ color: '#22c55e' }}>Signup link added</span>}
                     </div>
                   </div>
                   {s.invite_only && (
@@ -2504,6 +2534,7 @@ function NerdConPlanner() {
         sponsor_name: session.sponsor_name || null,
         event_image_url: session.event_image_url || null,
         sponsor_logo_url: session.sponsor_logo_url || null,
+        signup_url: session.signup_url || null,
         invite_only: session.invite_only || false,
       };
       if (session.capacity !== null && session.capacity !== undefined) payload.capacity = session.capacity;
